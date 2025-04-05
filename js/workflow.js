@@ -1,6 +1,186 @@
 // Workflow Management Functions
 
 let editingWorkflowId = null;
+let currentEditingStepIndex = null;
+let workflowStepSelectedContent = {};
+
+// Declare the function as a variable to hoist it before loadWorkflows()
+const editWorkflow = function(workflow) {
+  editingWorkflowId = workflow.id;
+  $("#workflowName").val(workflow.name);
+  $("#workflowDesc").val(workflow.description || "");
+  
+  // Clear existing steps
+  $("#workflowSteps").empty();
+  
+  // Reset the selected content storage
+  workflowStepSelectedContent = {};
+  
+  // Add each step from the workflow
+  if (workflow.steps && workflow.steps.length > 0) {
+    // First, fetch all actions to populate dropdowns
+    const transaction = db.transaction("actions", "readonly");
+    const store = transaction.objectStore("actions");
+    const actions = [];
+    
+    store.openCursor().onsuccess = function(e) {
+      const cursor = e.target.result;
+      if (cursor) {
+        actions.push(cursor.value);
+        cursor.continue();
+      } else {
+        // Once all actions are loaded, create the steps
+        workflow.steps.forEach((step, index) => {
+          // Create options for action selection
+          let actionOptions = actions.map(action => 
+            `<option value="${action.id}" ${action.id === step.actionId ? 'selected' : ''}>${action.title}</option>`
+          ).join('');
+          
+          // Store selected content if it exists
+          if (step.selectedContent) {
+            workflowStepSelectedContent[index] = step.selectedContent;
+          }
+          
+          // Convert legacy format if needed
+          const inputSources = step.inputSources || (step.inputSource ? [step.inputSource] : []);
+          
+          const stepHtml = `
+            <div class="workflow-step card mb-2" data-step-index="${index}">
+              <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                  <h6>Step ${index + 1}</h6>
+                  <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-secondary move-step-up-btn"><i class="fas fa-arrow-up"></i></button>
+                    <button type="button" class="btn btn-outline-secondary move-step-down-btn"><i class="fas fa-arrow-down"></i></button>
+                    <button type="button" class="btn btn-outline-danger remove-step-btn"><i class="fas fa-trash"></i></button>
+                  </div>
+                </div>
+                
+                <div class="form-row">
+                  <div class="col-md-12">
+                    <div class="form-group">
+                      <label>Action</label>
+                      <select class="form-control step-action-id" required>
+                        <option value="">Select an action...</option>
+                        ${actionOptions}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="form-group">
+                  <label>Input Sources</label>
+                  <div class="input-source-checks">
+                    ${inputSources.map(source => `
+                      <div class="form-check">
+                        <input class="form-check-input step-input-${source}" type="checkbox" id="input${source}-${index}" value="${source}" ${source === 'custom' ? 'checked' : ''}>
+                        <label class="form-check-label" for="input${source}-${index}">
+                          ${source.charAt(0).toUpperCase() + source.slice(1)} input
+                        </label>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+                
+                <div class="form-group custom-input-container" style="display:${inputSources.includes('custom') ? 'block' : 'none'};">
+                  <label>Custom Input</label>
+                  <textarea class="form-control step-custom-input" rows="3" placeholder="Enter custom input for this step">${step.customInput || ''}</textarea>
+                  <small class="form-text text-muted">Use {previous} to insert the output from the previous step</small>
+                </div>
+
+                <div class="mt-2">
+                  <button class="btn btn-sm btn-secondary selectStepContentBtn" type="button" data-step-index="${index}">
+                    Select Content
+                  </button>
+                  <span class="selected-content-indicator" style="display:${workflowStepSelectedContent[index] ? 'inline' : 'none'};">
+                    <i class="fas fa-check-circle text-success"></i> <span class="selected-count">${workflowStepSelectedContent[index] ? workflowStepSelectedContent[index].length : 0}</span> items selected
+                  </span>
+                </div>
+              </div>
+            </div>
+          `;
+          
+          // Add the step to the form
+          $("#workflowSteps").append(stepHtml);
+          
+          // Set up event handlers for this step
+          const $step = $("#workflowSteps .workflow-step").last();
+          
+          $step.find(".step-input-custom").on("change", function() {
+            const customInputContainer = $(this).closest(".workflow-step").find(".custom-input-container");
+            if ($(this).prop('checked')) {
+              customInputContainer.slideDown();
+            } else {
+              customInputContainer.slideUp();
+            }
+          });
+          
+          $step.find(".move-step-up-btn").on("click", function() {
+            const currentStep = $(this).closest(".workflow-step");
+            const prevStep = currentStep.prev(".workflow-step");
+            if (prevStep.length) {
+              currentStep.insertBefore(prevStep);
+              updateStepNumbers();
+            }
+          });
+          
+          $step.find(".move-step-down-btn").on("click", function() {
+            const currentStep = $(this).closest(".workflow-step");
+            const nextStep = currentStep.next(".workflow-step");
+            if (nextStep.length) {
+              currentStep.insertAfter(nextStep);
+              updateStepNumbers();
+            }
+          });
+          
+          $step.find(".remove-step-btn").on("click", function() {
+            if (confirm("Are you sure you want to remove this step?")) {
+              $(this).closest(".workflow-step").remove();
+              updateStepNumbers();
+              
+              if ($("#workflowSteps .workflow-step").length === 0) {
+                $("#workflowSteps").append('<p class="text-muted text-center my-3" id="emptyStepsMessage">No steps added yet. Click "Add Step" to begin.</p>');
+              }
+            }
+          });
+
+          $step.find(".selectStepContentBtn").on("click", function() {
+            openContentSelectionForStep($(this).data("step-index"));
+          });
+
+          $step.find(".step-input-selected").on("change", function() {
+            if ($(this).is(":checked") && !workflowStepSelectedContent[index]) {
+              openContentSelectionForStep(index);
+            }
+          });
+        });
+        
+        $("#saveWorkflowBtn").text("Update Workflow");
+      }
+    };
+  } else {
+    $("#saveWorkflowBtn").text("Update Workflow");
+  }
+};
+
+// Similar approach for deleteWorkflow
+const deleteWorkflow = function(id) {
+  if (confirm("Are you sure you want to delete this workflow?")) {
+    const transaction = db.transaction("workflows", "readwrite");
+    const store = transaction.objectStore("workflows");
+    
+    store.delete(id).onsuccess = function() {
+      loadWorkflows();
+      showNotification("Workflow deleted successfully!");
+      
+      if (editingWorkflowId === id) {
+        resetWorkflowForm();
+      }
+      
+      $("#workflowPreview").html('<p class="text-muted">Select a workflow to preview its steps and configuration.</p>');
+    };
+  }
+};
 
 // Make sure we have jQuery and bind the event as soon as possible
 function initWorkflowBindings() {
@@ -62,15 +242,76 @@ function initWorkflowBindings() {
 // Call initialization immediately
 initWorkflowBindings();
 
-// Also add it to document ready
 $(document).ready(function() {
   console.log("Document ready, initializing workflow bindings");
   initWorkflowBindings();
   
-  // Load workflows when the tab is shown
   $('a[data-toggle="tab"][href="#workflowsView"]').on('shown.bs.tab', function (e) {
     console.log("Workflows tab shown");
     loadWorkflows();
+  });
+
+  $("#confirmContentSelection").off("click.workflow").on("click.workflow", function() {
+    if (currentEditingStepIndex !== null) {
+      console.log(`Content selected for step ${currentEditingStepIndex}, items:`, selectedContentItems);
+      
+      workflowStepSelectedContent[currentEditingStepIndex] = [...selectedContentItems];
+      
+      const $step = $(`.workflow-step[data-step-index="${currentEditingStepIndex}"]`);
+      const itemCount = selectedContentItems.length;
+      
+      $step.find(".selectStepContentBtn")
+        .addClass("btn-success")
+        .removeClass("btn-secondary")
+        .text("Update Content");
+      
+      $step.find(".selected-content-indicator").show()
+        .find(".selected-count").text(itemCount);
+      
+      $step.find(".step-input-selected").prop("checked", true);
+      
+      $("#contentSelectionModal").modal("hide");
+    }
+  });
+  
+  $("#contentSelectionModal").on("hidden.bs.modal", function() {
+    currentEditingStepIndex = null;
+  });
+
+  $("#searchBlocksSelectionBtn").off("click").on("click", function() {
+    const searchTerm = $("#blockSelectionSearch").val().trim();
+    loadBlocksForSelection(searchTerm);
+  });
+  
+  $("#searchDocsSelectionBtn").off("click").on("click", function() {
+    const searchTerm = $("#docSelectionSearch").val().trim();
+    loadDocumentsForSelection(searchTerm);
+  });
+  
+  $("#blockSelectionSearch").off("keypress").on("keypress", function(e) {
+    if (e.which === 13) {
+      $("#searchBlocksSelectionBtn").click();
+    }
+  });
+  
+  $("#docSelectionSearch").off("keypress").on("keypress", function(e) {
+    if (e.which === 13) {
+      $("#searchDocsSelectionBtn").click();
+    }
+  });
+
+  // Modal initialization check
+  $('#contentSelectionModal').on('shown.bs.modal', function() {
+    console.log("Modal shown event triggered - modal is now visible");
+  });
+  
+  $('#contentSelectionModal').on('show.bs.modal', function() {
+    console.log("Modal show event triggered - modal is about to be shown");
+  });
+  
+  $('#contentSelectionModal').on('hidden.bs.modal', function() {
+    console.log("Modal hidden event triggered - modal is now hidden");
+    currentEditingStepIndex = null;
   });
 });
 
@@ -78,7 +319,6 @@ $(document).ready(function() {
 function loadWorkflows(searchTerm = "") {
   $("#workflowList").empty();
   
-  // Check if database is available
   if (!db || db.version === null) {
     $("#workflowList").append('<li class="list-group-item text-danger">Database not available. Please refresh the page.</li>');
     return;
@@ -132,22 +372,17 @@ function loadWorkflows(searchTerm = "") {
 function addWorkflowStep() {
   console.log("addWorkflowStep function called");
   
-  // Debugging display
   $("#debug-info").show().html('<div class="alert alert-info">Loading actions...</div>');
   
-  // Remove the empty steps message if it exists
   $("#emptyStepsMessage").remove();
   
-  // Show loading indicator
   $("#workflowSteps").append('<div class="text-center py-2" id="loading-actions"><i class="fas fa-spinner fa-spin"></i> Loading actions...</div>');
   
   try {
-    // Check if db is defined
     if (!window.db) {
       throw new Error("Database not initialized");
     }
     
-    // Create a promise-based wrapper for the IndexedDB transaction
     const getActionsPromise = new Promise((resolve, reject) => {
       try {
         const actions = [];
@@ -183,9 +418,7 @@ function addWorkflowStep() {
       }
     });
   
-    // Process the results from the promise
     getActionsPromise.then(actions => {
-      // Remove the loading indicator
       $("#loading-actions").remove();
       $("#debug-info").html(`<div class="alert alert-success">Successfully loaded ${actions.length} actions</div>`);
       
@@ -199,7 +432,6 @@ function addWorkflowStep() {
         return;
       }
       
-      // Create options for action selection
       let actionOptions = actions.map(action => 
         `<option value="${action.id}">${action.title || 'Untitled Action'}</option>`
       ).join('');
@@ -218,7 +450,7 @@ function addWorkflowStep() {
             </div>
             
             <div class="form-row">
-              <div class="col-md-6">
+              <div class="col-md-12">
                 <div class="form-group">
                   <label>Action</label>
                   <select class="form-control step-action-id" required>
@@ -227,14 +459,34 @@ function addWorkflowStep() {
                   </select>
                 </div>
               </div>
-              <div class="col-md-6">
-                <div class="form-group">
-                  <label>Input Source</label>
-                  <select class="form-control step-input-source">
-                    <option value="previous">Output from previous step</option>
-                    <option value="original">Original input</option>
-                    <option value="custom">Custom input</option>
-                  </select>
+            </div>
+            
+            <div class="form-group">
+              <label>Input Sources</label>
+              <div class="input-source-checks">
+                <div class="form-check">
+                  <input class="form-check-input step-input-previous" type="checkbox" id="inputPrevious-${stepIndex}" value="previous">
+                  <label class="form-check-label" for="inputPrevious-${stepIndex}">
+                    Output from previous step
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input step-input-original" type="checkbox" id="inputOriginal-${stepIndex}" value="original">
+                  <label class="form-check-label" for="inputOriginal-${stepIndex}">
+                    Original input
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input step-input-custom" type="checkbox" id="inputCustom-${stepIndex}" value="custom">
+                  <label class="form-check-label" for="inputCustom-${stepIndex}">
+                    Custom input
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input step-input-selected" type="checkbox" id="inputSelected-${stepIndex}" value="selected">
+                  <label class="form-check-label" for="inputSelected-${stepIndex}">
+                    Selected content
+                  </label>
                 </div>
               </div>
             </div>
@@ -244,26 +496,32 @@ function addWorkflowStep() {
               <textarea class="form-control step-custom-input" rows="3" placeholder="Enter custom input for this step"></textarea>
               <small class="form-text text-muted">Use {previous} to insert the output from the previous step</small>
             </div>
+
+            <div class="mt-2">
+              <button class="btn btn-sm btn-secondary selectStepContentBtn" type="button" data-step-index="${stepIndex}">
+                Select Content
+              </button>
+              <span class="selected-content-indicator" style="display:none;">
+                <i class="fas fa-check-circle text-success"></i> <span class="selected-count"></span> items selected
+              </span>
+            </div>
           </div>
         </div>
       `;
       
       $("#workflowSteps").append(stepHtml);
       
-      // Set up event handlers for the new step
       const $newStep = $("#workflowSteps .workflow-step").last();
       
-      // Input source change handler
-      $newStep.find(".step-input-source").on("change", function() {
+      $newStep.find(".step-input-custom").on("change", function() {
         const customInputContainer = $(this).closest(".workflow-step").find(".custom-input-container");
-        if ($(this).val() === "custom") {
+        if ($(this).prop('checked')) {
           customInputContainer.slideDown();
         } else {
           customInputContainer.slideUp();
         }
       });
       
-      // Move up button
       $newStep.find(".move-step-up-btn").on("click", function() {
         const currentStep = $(this).closest(".workflow-step");
         const prevStep = currentStep.prev(".workflow-step");
@@ -273,7 +531,6 @@ function addWorkflowStep() {
         }
       });
       
-      // Move down button
       $newStep.find(".move-step-down-btn").on("click", function() {
         const currentStep = $(this).closest(".workflow-step");
         const nextStep = currentStep.next(".workflow-step");
@@ -283,16 +540,24 @@ function addWorkflowStep() {
         }
       });
       
-      // Remove button
       $newStep.find(".remove-step-btn").on("click", function() {
         if (confirm("Are you sure you want to remove this step?")) {
           $(this).closest(".workflow-step").remove();
           updateStepNumbers();
           
-          // If no steps remain, add the empty message back
           if ($("#workflowSteps .workflow-step").length === 0) {
             $("#workflowSteps").append('<p class="text-muted text-center my-3" id="emptyStepsMessage">No steps added yet. Click "Add Step" to begin.</p>');
           }
+        }
+      });
+
+      $newStep.find(".selectStepContentBtn").on("click", function() {
+        openContentSelectionForStep($(this).data("step-index"));
+      });
+
+      $newStep.find(".step-input-selected").on("change", function() {
+        if ($(this).is(":checked") && !workflowStepSelectedContent[stepIndex]) {
+          openContentSelectionForStep(stepIndex);
         }
       });
     }).catch(error => {
@@ -319,32 +584,690 @@ function addWorkflowStep() {
   }
 }
 
-// Update step numbers after reordering
+// Function to open content selection modal
+function openContentSelectionForStep(stepIndex) {
+  currentEditingStepIndex = stepIndex;
+  console.log("Opening content selection for step", stepIndex);
+  
+  if (typeof window.selectedContentItems === 'undefined') {
+    window.selectedContentItems = [];
+  }
+  
+  // Reset selectedContentItems and populate with any existing selections
+  if (workflowStepSelectedContent[stepIndex]) {
+    selectedContentItems = [...workflowStepSelectedContent[stepIndex]];
+  } else {
+    selectedContentItems = [];
+  }
+  
+  // Debugging code to check modal visibility issues
+  console.log("Content selection modal element exists:", $("#contentSelectionModal").length > 0);
+  
+  // Create updateSelectedItemsUI function if it doesn't exist
+  if (typeof updateSelectedItemsUI !== 'function') {
+    window.updateSelectedItemsUI = function() {
+      const selectedItemsList = $("#selectedItemsList");
+      const selectedItemsCount = $("#selectedItemsCount");
+      
+      selectedItemsCount.text(selectedContentItems.length);
+      
+      if (selectedContentItems.length === 0) {
+        selectedItemsList.html('<p class="text-muted text-center mb-0">No items selected</p>');
+      } else {
+        let itemsHtml = '';
+        
+        selectedContentItems.forEach((item, index) => {
+          itemsHtml += `
+            <div class="selected-item mb-1 d-flex justify-content-between align-items-center">
+              <span>${item.title} <small class="text-muted">(${item.type})</small></span>
+              <button type="button" class="btn btn-sm btn-outline-danger remove-selected-item" data-index="${index}">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          `;
+        });
+        
+        selectedItemsList.html(itemsHtml);
+        
+        $(".remove-selected-item").on("click", function() {
+          const index = $(this).data("index");
+          
+          if (index >= 0 && index < selectedContentItems.length) {
+            const itemToRemove = selectedContentItems[index];
+            
+            if (itemToRemove.type === "block") {
+              $(`#block-${itemToRemove.id}, #block_${itemToRemove.id}, #ref-block-${itemToRemove.id}, #tag-block-${itemToRemove.id}`).prop("checked", false);
+            } else if (itemToRemove.type === "paragraph") {
+              $(`#para-${itemToRemove.docId}-${itemToRemove.paraIndex}, #tag-para-${itemToRemove.docId}-${itemToRemove.paraIndex}`).prop("checked", false);
+            }
+            
+            selectedContentItems.splice(index, 1);
+            updateSelectedItemsUI();
+          }
+        });
+      }
+    };
+  }
+  
+  updateSelectedItemsUI();
+  
+  // Setup modal content before showing
+  $(".action-selection-info").text("Select content for this workflow step");
+  $("#contentSelectionModal").data("selection-mode", "multiple");
+  
+  // Initialize the tab contents before showing modal (important for proper display)
+  $("#blocksTab").addClass("show active");
+  $("#documentsTab, #tagsTab, #referencesTab").removeClass("show active");
+  
+  // Show the modal
+  try {
+    // Remove any existing modals and backdrop
+    $(".modal-backdrop").remove();
+    
+    // Show modal with proper settings
+    $("#contentSelectionModal").modal({
+      backdrop: 'static',
+      keyboard: true,
+      show: true
+    });
+    
+    console.log("Modal shown with jQuery modal()");
+  } catch(error) {
+    console.error("Error showing modal:", error);
+    alert("Error showing content selection modal. Please see console for details.");
+  }
+  
+  // Load content for selection tabs
+  loadBlocksForSelection();
+  loadDocumentsForSelection();
+  
+  if (typeof loadTagsForSelection === 'function') {
+    loadTagsForSelection();
+  }
+  if (typeof loadReferencesForSelection === 'function') {
+    loadReferencesForSelection();
+  }
+}
+
+// Preview a workflow when clicked in the list
+function previewWorkflow(workflow) {
+  // Mark as selected for actions
+  selectedWorkflowId = workflow.id;
+  
+  // Create HTML for the workflow preview
+  let html = `
+    <h5>${workflow.name}</h5>
+    <p>${workflow.description || "<em>No description</em>"}</p>
+    
+    <div class="mt-3">
+      <strong>Steps:</strong>
+      <ol class="workflow-steps-list">
+  `;
+  
+  if (workflow.steps && workflow.steps.length > 0) {
+    // Get promises to fetch all action details
+    const promises = workflow.steps.map(step => {
+      return new Promise((resolve) => {
+        const tx = db.transaction("actions", "readonly");
+        const store = tx.objectStore("actions");
+        store.get(step.actionId).onsuccess = (e) => {
+          const action = e.target.result;
+          resolve({
+            step: step,
+            action: action || { title: `Unknown Action (ID: ${step.actionId})` }
+          });
+        };
+      });
+    });
+    
+    // Wait for all action details to be fetched
+    Promise.all(promises).then(results => {
+      results.forEach(result => {
+        const step = result.step;
+        const action = result.action;
+        
+        let inputSourcesText = '';
+        if (step.inputSources && step.inputSources.length > 0) {
+          inputSourcesText = step.inputSources.map(src => 
+            `<span class="badge badge-info mr-1">${src}</span>`
+          ).join(' ');
+        }
+        
+        let selectedContentText = '';
+        if (step.selectedContent && step.selectedContent.length > 0) {
+          selectedContentText = `<span class="badge badge-success">${step.selectedContent.length} items selected</span>`;
+        }
+        
+        html += `
+          <li class="mb-2">
+            <div class="card">
+              <div class="card-body py-2">
+                <strong>${action.title}</strong>
+                <div class="text-muted small">
+                  <strong>Inputs:</strong> ${inputSourcesText || '<em>None</em>'}
+                </div>
+                <div class="mt-1">
+                  ${selectedContentText}
+                  ${step.customInput ? '<span class="badge badge-secondary">Custom input provided</span>' : ''}
+                </div>
+              </div>
+            </div>
+          </li>
+        `;
+      });
+      
+      html += `
+          </ol>
+        </div>
+        <div class="mt-3 d-flex justify-content-end">
+          <button class="btn btn-primary run-workflow-btn" data-workflow-id="${workflow.id}">
+            <i class="fas fa-play"></i> Run Workflow
+          </button>
+        </div>
+      `;
+      
+      $("#workflowPreview").html(html);
+      
+      // Add event listener for the run button
+      $(".run-workflow-btn").click(function() {
+        const workflowId = $(this).data("workflow-id");
+        runWorkflow(workflowId);
+      });
+    });
+  } else {
+    html += `
+          <li><em>This workflow has no steps.</em></li>
+        </ol>
+      </div>
+    `;
+    
+    $("#workflowPreview").html(html);
+  }
+}
+
+// Update step numbers when reordering steps
 function updateStepNumbers() {
-  $("#workflowSteps .workflow-step").each(function(index) {
-    $(this).attr("data-step-index", index);
+  $(".workflow-step").each(function(index) {
+    $(this).data("step-index", index);
     $(this).find("h6").text(`Step ${index + 1}`);
+    $(this).attr("data-step-index", index);
   });
 }
 
-// Handle workflow form submission
+// Reset workflow form
+function resetWorkflowForm() {
+  editingWorkflowId = null;
+  $("#workflowForm")[0].reset();
+  $("#workflowSteps").empty();
+  $("#workflowSteps").append('<p class="text-muted text-center my-3" id="emptyStepsMessage">No steps added yet. Click "Add Step" to begin.</p>');
+  $("#saveWorkflowBtn").text("Save Workflow");
+  workflowStepSelectedContent = {};
+}
+
+// Function to run a workflow
+function runWorkflow(workflowId) {
+  $("#workflowResultContainer").html('<div class="text-center py-3"><i class="fas fa-spinner fa-spin"></i> Running workflow...</div>');
+  
+  const tx = db.transaction("workflows", "readonly");
+  const store = tx.objectStore("workflows");
+  
+  store.get(parseInt(workflowId)).onsuccess = async function(e) {
+    const workflow = e.target.result;
+    
+    if (!workflow) {
+      $("#workflowResultContainer").html('<div class="alert alert-danger">Workflow not found</div>');
+      return;
+    }
+    
+    // Check if workflow has steps
+    if (!workflow.steps || workflow.steps.length === 0) {
+      $("#workflowResultContainer").html('<div class="alert alert-warning">This workflow has no steps to execute</div>');
+      return;
+    }
+    
+    // Check for API key
+    const openaiApiKey = localStorage.getItem('openai_api_key');
+    if (!openaiApiKey) {
+      $("#workflowResultContainer").html(`
+        <div class="alert alert-warning">
+          <strong>API Key Missing!</strong> Please add your OpenAI API key in the Settings tab to use this feature.
+        </div>
+      `);
+      return;
+    }
+
+    try {
+      // Create a results display area
+      const resultsDiv = $(`
+        <div class="workflow-results">
+          <h5>Workflow Results</h5>
+          <div class="workflow-steps-results"></div>
+        </div>
+      `);
+      
+      $("#workflowResultContainer").html('');
+      $("#workflowResultContainer").append(resultsDiv);
+      
+      // Variables to track state through steps
+      let originalInput = "";
+      let previousOutput = "";
+      
+      // Execute each step sequentially
+      for (let stepIndex = 0; stepIndex < workflow.steps.length; stepIndex++) {
+        const step = workflow.steps[stepIndex];
+        const stepResultDiv = $(`
+          <div class="card mb-3 workflow-step-result">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <span>Step ${stepIndex + 1}</span>
+              <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="sr-only">Loading...</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="step-status">Running...</div>
+              <div class="step-output" style="display:none;"></div>
+            </div>
+          </div>
+        `);
+        
+        // Add the step result to the display
+        $(".workflow-steps-results").append(stepResultDiv);
+        
+        try {
+          // Get the action for this step
+          const action = await getActionById(step.actionId);
+          
+          if (!action) {
+            throw new Error(`Action (ID: ${step.actionId}) not found`);
+          }
+          
+          // Update step status to show which action is running
+          stepResultDiv.find(".step-status").html(`
+            <div class="d-flex align-items-center">
+              <div class="mr-2">Running action: <strong>${action.title}</strong></div>
+            </div>
+          `);
+          
+          // Assemble the input for this step based on its input sources
+          let stepInput = "";
+          
+          // If this is the first step, original input is what the user types
+          if (stepIndex === 0) {
+            originalInput = $("#workflowTestInput").val() || "";
+          }
+          
+          if (step.inputSources) {
+            // Process each input source
+            for (const source of step.inputSources) {
+              switch (source) {
+                case "previous":
+                  if (previousOutput) {
+                    stepInput += (stepInput ? "\n\n---\n\n" : "") + previousOutput;
+                  }
+                  break;
+                  
+                case "original":
+                  if (originalInput) {
+                    stepInput += (stepInput ? "\n\n---\n\n" : "") + originalInput;
+                  }
+                  break;
+                  
+                case "custom":
+                  if (step.customInput) {
+                    // Replace {previous} placeholder with actual previous output
+                    let customInput = step.customInput.replace(/{previous}/g, previousOutput);
+                    stepInput += (stepInput ? "\n\n---\n\n" : "") + customInput;
+                  }
+                  break;
+                  
+                case "selected":
+                  if (step.selectedContent && step.selectedContent.length) {
+                    // Process selected content similar to actions.js
+                    const contentText = await assembleContentFromSelectedItems(step.selectedContent);
+                    if (contentText) {
+                      stepInput += (stepInput ? "\n\n---\n\n" : "") + contentText;
+                    }
+                  }
+                  break;
+              }
+            }
+          }
+          
+          // If no input was assembled, use an empty string
+          if (!stepInput) {
+            stepInput = "";
+          }
+          
+          // Replace the content placeholder in the prompt
+          const processedPrompt = action.prompt.replace(/{content}/g, stepInput);
+          
+          // Call the OpenAI API
+          const stepOutput = await callOpenAiApi(processedPrompt, action, stepInput);
+          
+          // Update the previous output for the next step
+          previousOutput = stepOutput;
+          
+          // Update the step result in the display
+          stepResultDiv.find(".spinner-border").remove();
+          stepResultDiv.find(".card-header").append(`
+            <span class="badge badge-success">Completed</span>
+          `);
+          
+          stepResultDiv.find(".step-status").html(`
+            <div>
+              <strong>${action.title}</strong> completed successfully
+              <button class="btn btn-sm btn-outline-secondary toggle-output-btn mt-2">
+                Show Output
+              </button>
+            </div>
+          `);
+          
+          stepResultDiv.find(".step-output").html(`
+            <div class="mt-3">
+              <div class="card bg-light">
+                <div class="card-header d-flex justify-content-between">
+                  <span>Output</span>
+                  <button class="btn btn-sm btn-outline-primary copy-output-btn">
+                    <i class="fas fa-copy"></i> Copy
+                  </button>
+                </div>
+                <div class="card-body">
+                  <pre class="mb-0">${stepOutput}</pre>
+                </div>
+              </div>
+            </div>
+          `);
+          
+          // Add event handlers for the buttons
+          stepResultDiv.find(".toggle-output-btn").on("click", function() {
+            const outputDiv = stepResultDiv.find(".step-output");
+            const $btn = $(this);
+            
+            if (outputDiv.is(":visible")) {
+              outputDiv.slideUp();
+              $btn.text("Show Output");
+            } else {
+              outputDiv.slideDown();
+              $btn.text("Hide Output");
+            }
+          });
+          
+          stepResultDiv.find(".copy-output-btn").on("click", function() {
+            copyTextToClipboard(stepOutput);
+          });
+          
+        } catch (stepError) {
+          // Update the step result to show the error
+          stepResultDiv.find(".spinner-border").remove();
+          stepResultDiv.find(".card-header").append(`
+            <span class="badge badge-danger">Failed</span>
+          `);
+          
+          stepResultDiv.find(".step-status").html(`
+            <div class="alert alert-danger">
+              Error: ${stepError.message || stepError}
+            </div>
+          `);
+          
+          // Stop the workflow execution on error
+          throw new Error(`Step ${stepIndex + 1} failed: ${stepError.message || stepError}`);
+        }
+      }
+      
+      // Add a final success message
+      $("#workflowResultContainer").append(`
+        <div class="alert alert-success mt-3">
+          <i class="fas fa-check-circle"></i> Workflow "${workflow.name}" completed successfully!
+        </div>
+      `);
+      
+      // Add a button to save the final result
+      $("#workflowResultContainer").append(`
+        <div class="mt-3">
+          <button class="btn btn-success save-workflow-result">
+            <i class="fas fa-save"></i> Save Final Result as Paragraph
+          </button>
+        </div>
+      `);
+      
+      // Add event handler for saving the final result
+      $(".save-workflow-result").on("click", function() {
+        if (previousOutput) {
+          saveResultAsParagraph(previousOutput);
+        }
+      });
+      
+    } catch (error) {
+      // Add overall error message if the workflow fails
+      $("#workflowResultContainer").append(`
+        <div class="alert alert-danger mt-3">
+          <i class="fas fa-exclamation-triangle"></i> Workflow execution stopped: ${error.message || error}
+        </div>
+      `);
+    }
+  };
+}
+
+// Helper function to get an action by its ID
+function getActionById(actionId) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("actions", "readonly");
+    const store = tx.objectStore("actions");
+    
+    store.get(parseInt(actionId)).onsuccess = function(e) {
+      resolve(e.target.result);
+    };
+    
+    store.get(parseInt(actionId)).onerror = function(e) {
+      reject(e.target.error);
+    };
+  });
+}
+
+// Assemble content from selected items (for workflow steps)
+async function assembleContentFromSelectedItems(selectedItems) {
+  if (!selectedItems || !selectedItems.length) return "";
+  
+  let contentParts = [];
+  const blockFetchPromises = [];
+  const paragraphFetchPromises = [];
+  
+  // Process blocks
+  for (const item of selectedItems) {
+    if (item.type === "block") {
+      blockFetchPromises.push(
+        new Promise((resolve, reject) => {
+          const transaction = db.transaction("blocks", "readonly");
+          const store = transaction.objectStore("blocks");
+          
+          store.get(parseInt(item.id)).onsuccess = function(e) {
+            const block = e.target.result;
+            if (block) {
+              resolve({
+                id: block.id,
+                title: block.title || `Block ${block.id}`,
+                text: block.text || "",
+                tags: block.tags,
+                standard: block.standard,
+                stdLevels: block.stdLevels
+              });
+            } else {
+              resolve({
+                id: item.id,
+                title: `Unknown Block ${item.id}`,
+                text: `Block with ID ${item.id} not found`,
+                error: true
+              });
+            }
+          };
+        })
+      );
+    } else if (item.type === "paragraph") {
+      paragraphFetchPromises.push(
+        new Promise((resolve, reject) => {
+          const transaction = db.transaction("documents", "readonly");
+          const store = transaction.objectStore("documents");
+          
+          store.get(parseInt(item.docId)).onsuccess = function(e) {
+            const doc = e.target.result;
+            if (doc && doc.paragraphs && doc.paragraphs[item.paraIndex]) {
+              const para = doc.paragraphs[item.paraIndex];
+              
+              // Fetch referenced blocks if any
+              const refBlockPromises = [];
+              if (para.blockRefs && para.blockRefs.length > 0) {
+                para.blockRefs.forEach(blockId => {
+                  refBlockPromises.push(
+                    new Promise((resolveBlock) => {
+                      const blockTx = db.transaction("blocks", "readonly");
+                      const blockStore = blockTx.objectStore("blocks");
+                      blockStore.get(parseInt(blockId)).onsuccess = function(e) {
+                        const block = e.target.result;
+                        if (block) {
+                          resolveBlock({
+                            id: block.id,
+                            title: block.title || `Block ${block.id}`,
+                            text: block.content
+                          });
+                        } else {
+                          resolveBlock({
+                            id: blockId,
+                            title: `Unknown Block ${blockId}`,
+                            text: `Block with ID ${blockId} not found`,
+                            error: true
+                          });
+                        }
+                      };
+                    })
+                  );
+                });
+              }
+              
+              Promise.all(refBlockPromises).then(refBlocks => {
+                resolve({
+                  id: `${doc.id}-${item.paraIndex}`,
+                  docTitle: doc.title,
+                  paragraphNumber: item.paraIndex + 1,
+                  text: para.content,
+                  tags: para.tags,
+                  refBlocks: refBlocks
+                });
+              });
+            } else {
+              resolve({
+                id: item.id,
+                text: `Paragraph not found`,
+                error: true
+              });
+            }
+          };
+        })
+      );
+    }
+  }
+  
+  // Wait for all blocks to be fetched
+  const blocks = await Promise.all(blockFetchPromises);
+  for (const block of blocks) {
+    contentParts.push(`# Block: ${block.title}\n\n${block.text || ""}`);
+  }
+  
+  // Wait for all paragraphs and their referenced blocks
+  const paragraphs = await Promise.all(paragraphFetchPromises);
+  for (const para of paragraphs) {
+    if (para.error) {
+      contentParts.push(`# Error fetching paragraph\n\n${para.text || "Unknown error"}`);
+      continue;
+    }
+    
+    contentParts.push(`# Paragraph ${para.paragraphNumber} from "${para.docTitle}"\n\n${para.text || ""}`);
+    
+    // Add referenced blocks for this paragraph
+    if (para.refBlocks && para.refBlocks.length) {
+      for (const refBlock of para.refBlocks) {
+        contentParts.push(`## Referenced Block: ${refBlock.title}\n\n${refBlock.text}`);
+      }
+    }
+  }
+  
+  return contentParts.join("\n\n---\n\n");
+}
+
+// This function already exists in your actions.js, adding as a copy here
+// to make workflow.js independent if needed
+function copyTextToClipboard(text) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'absolute';
+  textarea.style.left = '-9999px';
+  document.body.appendChild(textarea);
+  
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
+  
+  showNotification("Text copied to clipboard!");
+}
+
+// Save result as a paragraph in the document form (copy from actions.js)
+function saveResultAsParagraph(text) {
+  // Switch to Documents tab
+  $('#viewTabs a[href="#documentsView"]').tab('show');
+  
+  // Add a new paragraph if there's not already one
+  if ($("#paragraphContainer").children().length === 0) {
+    addParagraph();
+  } else {
+    // Otherwise, add a new paragraph at the end
+    addParagraph();
+  }
+  
+  // Get the last paragraph added and set its content
+  const lastParagraph = $("#paragraphContainer .paragraph-block").last();
+  lastParagraph.find(".docParagraph").val(text);
+  
+  // Show notification
+  showNotification("Results added as a new paragraph!", "success");
+}
+
 function handleWorkflowFormSubmit() {
   const name = $("#workflowName").val().trim();
   const description = $("#workflowDesc").val().trim();
   
-  // Collect steps data
   const steps = [];
   $("#workflowSteps .workflow-step").each(function() {
+    const stepIndex = parseInt($(this).data("step-index"));
     const actionId = $(this).find(".step-action-id").val();
-    const inputSource = $(this).find(".step-input-source").val();
+    
+    const inputSources = [];
+    if ($(this).find(".step-input-previous").prop('checked')) {
+      inputSources.push("previous");
+    }
+    if ($(this).find(".step-input-original").prop('checked')) {
+      inputSources.push("original");
+    }
+    if ($(this).find(".step-input-custom").prop('checked')) {
+      inputSources.push("custom");
+    }
+    if ($(this).find(".step-input-selected").prop('checked')) {
+      inputSources.push("selected");
+    }
+    
     const customInput = $(this).find(".step-custom-input").val();
     
     if (actionId) {
-      steps.push({
+      const stepData = {
         actionId: parseInt(actionId),
-        inputSource: inputSource,
-        customInput: inputSource === "custom" ? customInput : ""
-      });
+        inputSources: inputSources,
+        customInput: inputSources.includes("custom") ? customInput : ""
+      };
+      
+      if (inputSources.includes("selected") && workflowStepSelectedContent[stepIndex]) {
+        stepData.selectedContent = workflowStepSelectedContent[stepIndex];
+      }
+      
+      steps.push(stepData);
     }
   });
   
@@ -384,739 +1307,4 @@ function handleWorkflowFormSubmit() {
       loadWorkflows();
     };
   }
-}
-
-// Reset workflow form
-function resetWorkflowForm() {
-  editingWorkflowId = null;
-  $("#workflowForm")[0].reset();
-  $("#workflowSteps").empty();
-  $("#saveWorkflowBtn").text("Save Workflow");
-}
-
-// Preview workflow
-function previewWorkflow(workflow) {
-  // Fetch action details for each step
-  const steps = workflow.steps || [];
-  let pendingSteps = steps.length;
-  const actionDetails = {};
-  
-  if (steps.length === 0) {
-    renderWorkflowPreview(workflow, {});
-    return;
-  }
-  
-  steps.forEach(step => {
-    const transaction = db.transaction("actions", "readonly");
-    const store = transaction.objectStore("actions");
-    
-    store.get(parseInt(step.actionId)).onsuccess = function(e) {
-      const action = e.target.result;
-      
-      if (action) {
-        actionDetails[step.actionId] = {
-          title: action.title,
-          description: action.description,
-          model: action.model
-        };
-      }
-      
-      pendingSteps--;
-      if (pendingSteps === 0) {
-        renderWorkflowPreview(workflow, actionDetails);
-      }
-    };
-  });
-}
-
-// Render workflow preview with action details
-function renderWorkflowPreview(workflow, actionDetails) {
-  let html = `
-    <h5>${workflow.name}</h5>
-    <p>${workflow.description || "<em>No description</em>"}</p>
-    
-    <div class="workflow-steps-preview">
-      <h6>Workflow Steps:</h6>
-      ${workflow.steps && workflow.steps.length > 0 ? '' : '<p class="text-muted">This workflow has no steps defined.</p>'}
-  `;
-  
-  if (workflow.steps && workflow.steps.length > 0) {
-    workflow.steps.forEach((step, index) => {
-      const action = actionDetails[step.actionId] || { title: "Unknown Action", model: "Unknown Model" };
-      
-      html += `
-        <div class="card mb-2">
-          <div class="card-header">
-            Step ${index + 1}: ${action.title}
-          </div>
-          <div class="card-body">
-            <div><strong>Model:</strong> ${action.model}</div>
-            <div><strong>Input Source:</strong> ${step.inputSource === "previous" ? "Output from previous step" : 
-                           step.inputSource === "original" ? "Original input" : "Custom input"}</div>
-            ${step.inputSource === "custom" && step.customInput ? 
-              `<div class="mt-2"><strong>Custom Input:</strong><br><pre class="bg-light p-2 border rounded">${step.customInput}</pre></div>` : ''}
-          </div>
-        </div>
-      `;
-    });
-    
-    html += `
-      <div class="mt-3">
-        <button class="btn btn-primary run-workflow-straight-btn" data-workflow-id="${workflow.id}">
-          <i class="fas fa-play"></i> Run Entire Workflow
-        </button>
-        <button class="btn btn-outline-primary run-workflow-interactive-btn" data-workflow-id="${workflow.id}">
-          <i class="fas fa-step-forward"></i> Configure & Run Step-by-Step
-        </button>
-      </div>
-    `;
-  }
-  
-  html += `</div>`;
-  
-  $("#workflowPreview").html(html);
-  
-  // Add event handlers for run buttons
-  $(".run-workflow-straight-btn").on("click", function() {
-    const workflowId = $(this).data("workflow-id");
-    runWorkflow(workflowId, "straight");
-  });
-  
-  $(".run-workflow-interactive-btn").on("click", function() {
-    const workflowId = $(this).data("workflow-id");
-    runWorkflow(workflowId, "interactive");
-  });
-}
-
-// Edit workflow
-function editWorkflow(workflow) {
-  editingWorkflowId = workflow.id;
-  $("#workflowName").val(workflow.name);
-  $("#workflowDesc").val(workflow.description || "");
-  
-  // Clear existing steps
-  $("#workflowSteps").empty();
-  
-  // Add each step from the workflow
-  if (workflow.steps && workflow.steps.length > 0) {
-    // First, fetch all actions to populate dropdowns
-    const transaction = db.transaction("actions", "readonly");
-    const store = transaction.objectStore("actions");
-    const actions = [];
-    
-    store.openCursor().onsuccess = function(e) {
-      const cursor = e.target.result;
-      if (cursor) {
-        actions.push(cursor.value);
-        cursor.continue();
-      } else {
-        // Once all actions are loaded, create the steps
-        workflow.steps.forEach((step, index) => {
-          // Create options for action selection
-          let actionOptions = actions.map(action => 
-            `<option value="${action.id}" ${action.id === step.actionId ? 'selected' : ''}>${action.title}</option>`
-          ).join('');
-          
-          const stepHtml = `
-            <div class="workflow-step card mb-2" data-step-index="${index}">
-              <div class="card-body">
-                <div class="d-flex justify-content-between mb-2">
-                  <h6>Step ${index + 1}</h6>
-                  <div class="btn-group btn-group-sm">
-                    <button type="button" class="btn btn-outline-secondary move-step-up-btn"><i class="fas fa-arrow-up"></i></button>
-                    <button type="button" class="btn btn-outline-secondary move-step-down-btn"><i class="fas fa-arrow-down"></i></button>
-                    <button type="button" class="btn btn-outline-danger remove-step-btn"><i class="fas fa-trash"></i></button>
-                  </div>
-                </div>
-                
-                <div class="form-row">
-                  <div class="col-md-6">
-                    <div class="form-group">
-                      <label>Action</label>
-                      <select class="form-control step-action-id" required>
-                        <option value="">Select an action...</option>
-                        ${actionOptions}
-                      </select>
-                    </div>
-                  </div>
-                  <div class="col-md-6">
-                    <div class="form-group">
-                      <label>Input Source</label>
-                      <select class="form-control step-input-source">
-                        <option value="previous" ${step.inputSource === "previous" ? 'selected' : ''}>Output from previous step</option>
-                        <option value="original" ${step.inputSource === "original" ? 'selected' : ''}>Original input</option>
-                        <option value="custom" ${step.inputSource === "custom" ? 'selected' : ''}>Custom input</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-                
-                <div class="form-group custom-input-container" style="${step.inputSource === 'custom' ? '' : 'display:none;'}">
-                  <label>Custom Input</label>
-                  <textarea class="form-control step-custom-input" rows="3" placeholder="Enter custom input for this step">${step.customInput || ''}</textarea>
-                  <small class="form-text text-muted">Use {previous} to insert the output from the previous step</small>
-                </div>
-              </div>
-            </div>
-          `;
-          
-          // Add the step to the form
-          $("#workflowSteps").append(stepHtml);
-          
-          // Set up event handlers for this step
-          const $step = $("#workflowSteps .workflow-step").last();
-          
-          // Input source change handler
-          $step.find(".step-input-source").on("change", function() {
-            const customInputContainer = $(this).closest(".workflow-step").find(".custom-input-container");
-            if ($(this).val() === "custom") {
-              customInputContainer.slideDown();
-            } else {
-              customInputContainer.slideUp();
-            }
-          });
-          
-          // Move up button
-          $step.find(".move-step-up-btn").on("click", function() {
-            const currentStep = $(this).closest(".workflow-step");
-            const prevStep = currentStep.prev(".workflow-step");
-            if (prevStep.length) {
-              currentStep.insertBefore(prevStep);
-              updateStepNumbers();
-            }
-          });
-          
-          // Move down button
-          $step.find(".move-step-down-btn").on("click", function() {
-            const currentStep = $(this).closest(".workflow-step");
-            const nextStep = currentStep.next(".workflow-step");
-            if (nextStep.length) {
-              currentStep.insertAfter(nextStep);
-              updateStepNumbers();
-            }
-          });
-          
-          // Remove button
-          $step.find(".remove-step-btn").on("click", function() {
-            if (confirm("Are you sure you want to remove this step?")) {
-              $(this).closest(".workflow-step").remove();
-              updateStepNumbers();
-            }
-          });
-        });
-        
-        $("#saveWorkflowBtn").text("Update Workflow");
-      }
-    };
-  } else {
-    $("#saveWorkflowBtn").text("Update Workflow");
-  }
-}
-
-// Delete workflow
-function deleteWorkflow(id) {
-  if (confirm("Are you sure you want to delete this workflow?")) {
-    const transaction = db.transaction("workflows", "readwrite");
-    const store = transaction.objectStore("workflows");
-    
-    store.delete(id).onsuccess = function() {
-      loadWorkflows();
-      showNotification("Workflow deleted successfully!");
-      
-      if (editingWorkflowId === id) {
-        resetWorkflowForm();
-      }
-      
-      $("#workflowPreview").html('<p class="text-muted">Select a workflow to preview its steps and configuration.</p>');
-    };
-  }
-}
-
-// Run workflow handler
-function runWorkflow(workflowId, mode) {
-  // Get the workflow
-  const transaction = db.transaction("workflows", "readonly");
-  const store = transaction.objectStore("workflows");
-  
-  store.get(parseInt(workflowId)).onsuccess = function(e) {
-    const workflow = e.target.result;
-    
-    if (!workflow) {
-      showNotification("Workflow not found", "danger");
-      return;
-    }
-    
-    // Check if API key is available
-    if (!openaiApiKey) {
-      $("#workflowResultContainer").html(`
-        <div class="alert alert-warning">
-          <strong>API Key Missing!</strong> Please add your OpenAI API key in the Settings tab to use this feature.
-        </div>
-      `);
-      return;
-    }
-    
-    // Show loading state
-    $("#workflowResultContainer").html('<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Setting up workflow execution...</div>');
-    
-    // Determine how to run the workflow based on mode
-    if (mode === "interactive") {
-      setupInteractiveWorkflow(workflow);
-    } else {
-      runEntireWorkflow(workflow);
-    }
-  };
-}
-
-// Set up interactive workflow execution
-function setupInteractiveWorkflow(workflow) {
-  const steps = workflow.steps || [];
-  
-  if (steps.length === 0) {
-    $("#workflowResultContainer").html('<div class="alert alert-warning">This workflow has no steps defined.</div>');
-    return;
-  }
-  
-  // Create UI for interactive workflow
-  let html = `
-    <div class="interactive-workflow-container">
-      <h5>Interactive Workflow: ${workflow.name}</h5>
-      <div class="progress mb-3">
-        <div class="progress-bar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
-      </div>
-      
-      <div class="workflow-input-container mb-3">
-        <h6>Initial Input</h6>
-        <textarea class="form-control workflow-initial-input" rows="4" placeholder="Enter initial content for the workflow..."></textarea>
-      </div>
-      
-      <div class="workflow-steps-container">
-        <!-- Steps will be rendered here as the workflow progresses -->
-      </div>
-      
-      <button class="btn btn-primary start-workflow-btn mt-3">
-        <i class="fas fa-play"></i> Start Workflow
-      </button>
-    </div>
-  `;
-  
-  $("#workflowResultContainer").html(html);
-  
-  // Handle start button click
-  $(".start-workflow-btn").on("click", function() {
-    const initialInput = $(".workflow-initial-input").val();
-    
-    if (!initialInput.trim()) {
-      showNotification("Please provide initial input for the workflow", "warning");
-      return;
-    }
-    
-    // Begin the workflow execution
-    executeWorkflowInteractively(workflow, initialInput);
-    
-    // Change button to reflect running state
-    $(this).prop("disabled", true).html('<i class="fas fa-spinner fa-spin"></i> Running...');
-  });
-}
-
-// Execute workflow interactively
-function executeWorkflowInteractively(workflow, initialInput) {
-  const steps = workflow.steps || [];
-  let currentStepIndex = 0;
-  let previousOutput = initialInput;
-  
-  // Function to execute the current step
-  function executeStep() {
-    if (currentStepIndex >= steps.length) {
-      // Workflow is complete
-      $(".progress-bar").css("width", "100%").attr("aria-valuenow", 100);
-      showNotification("Workflow execution completed!", "success");
-      return;
-    }
-    
-    const step = steps[currentStepIndex];
-    const progress = Math.round(((currentStepIndex + 1) / steps.length) * 100);
-    
-    // Update progress bar
-    $(".progress-bar").css("width", progress + "%").attr("aria-valuenow", progress);
-    
-    // Get the action details
-    const tx = db.transaction("actions", "readonly");
-    const actionStore = tx.objectStore("actions");
-    
-    actionStore.get(parseInt(step.actionId)).onsuccess = function(e) {
-      const action = e.target.result;
-      
-      if (!action) {
-        appendStepError(currentStepIndex, "Action not found");
-        currentStepIndex++;
-        executeStep();
-        return;
-      }
-      
-      // Determine input for this step
-      let stepInput;
-      
-      switch (step.inputSource) {
-        case "original":
-          stepInput = initialInput;
-          break;
-        case "custom":
-          // Replace {previous} placeholders in custom input
-          stepInput = step.customInput.replace(/{previous}/g, previousOutput);
-          break;
-        case "previous":
-        default:
-          stepInput = previousOutput;
-          break;
-      }
-      
-      // Render step UI
-      appendStepUI(currentStepIndex, action, stepInput);
-      
-      // Process the input with the action
-      const processedPrompt = action.prompt.replace(/{content}/g, stepInput || "");
-      
-      // Call the OpenAI API
-      callOpenAiApi(processedPrompt, action, stepInput)
-        .then(response => {
-          // Update the step UI with the result
-          updateStepWithResult(currentStepIndex, response);
-          
-          // Store the output for the next step
-          previousOutput = response;
-          
-          // Move to the next step
-          currentStepIndex++;
-          
-          // Execute the next step
-          setTimeout(executeStep, 500);
-        })
-        .catch(error => {
-          // Handle error
-          appendStepError(currentStepIndex, error.message || "Failed to process this step");
-          
-          // Move to the next step
-          currentStepIndex++;
-          executeStep();
-        });
-    };
-  }
-  
-  // Append step UI to the workflow container
-  function appendStepUI(index, action, input) {
-    const stepHtml = `
-      <div class="workflow-step-container mb-3" id="workflow-step-${index}">
-        <div class="card">
-          <div class="card-header">
-            Step ${index + 1}: ${action.title}
-          </div>
-          <div class="card-body">
-            <h6>Input:</h6>
-            <pre class="bg-light p-2 border rounded mb-3">${input}</pre>
-            
-            <h6>Processing...</h6>
-            <div class="text-center">
-              <i class="fas fa-spinner fa-spin"></i>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-    
-    $(".workflow-steps-container").append(stepHtml);
-    
-    // Scroll to the new step
-    $('html, body').animate({
-      scrollTop: $(`#workflow-step-${index}`).offset().top - 100
-    }, 500);
-  }
-  
-  // Update step UI with result
-  function updateStepWithResult(index, result) {
-    const stepContainer = $(`#workflow-step-${index} .card-body`);
-    
-    // Replace the loading indicator with the result
-    stepContainer.find("h6:last").text("Output:");
-    stepContainer.find(".text-center").replaceWith(`
-      <div>
-        <pre class="bg-light p-2 border rounded">${result}</pre>
-        <div class="btn-group mt-2">
-          <button class="btn btn-sm btn-outline-primary copy-step-result-btn" data-step="${index}">
-            <i class="fas fa-copy"></i> Copy
-          </button>
-          <button class="btn btn-sm btn-outline-success save-step-result-btn" data-step="${index}" data-result="${encodeURIComponent(result)}">
-            <i class="fas fa-save"></i> Save as Paragraph
-          </button>
-        </div>
-      </div>
-    `);
-    
-    // Set up copy button handler
-    $(`#workflow-step-${index} .copy-step-result-btn`).on("click", function() {
-      copyTextToClipboard(result);
-    });
-    
-    // Set up save button handler
-    $(`#workflow-step-${index} .save-step-result-btn`).on("click", function() {
-      saveResultAsParagraph(result);
-    });
-  }
-  
-  // Append error to step UI
-  function appendStepError(index, errorMessage) {
-    const stepContainer = $(`#workflow-step-${index} .card-body`);
-    
-    // Replace the loading indicator with the error
-    stepContainer.find("h6:last").text("Error:");
-    stepContainer.find(".text-center").replaceWith(`
-      <div class="alert alert-danger">
-        ${errorMessage}
-      </div>
-    `);
-  }
-  
-  // Start executing the workflow
-  executeStep();
-}
-
-// Run the entire workflow without interactive steps
-async function runEntireWorkflow(workflow) {
-  const steps = workflow.steps || [];
-  
-  if (steps.length === 0) {
-    $("#workflowResultContainer").html('<div class="alert alert-warning">This workflow has no steps defined.</div>');
-    return;
-  }
-  
-  // Show workflow execution UI
-  $("#workflowResultContainer").html(`
-    <div class="card mb-3">
-      <div class="card-header">
-        <h5 class="mb-0">Executing Workflow: ${workflow.name}</h5>
-      </div>
-      <div class="card-body">
-        <div class="form-group">
-          <label for="workflowInput">Input Content</label>
-          <textarea id="workflowInput" class="form-control" rows="4" placeholder="Enter content to process..."></textarea>
-        </div>
-        <button id="startWorkflowBtn" class="btn btn-primary">Start Execution</button>
-        
-        <div class="progress mt-3" style="display:none;">
-          <div class="progress-bar" role="progressbar" style="width: 0%"></div>
-        </div>
-        
-        <div id="workflowStatus" class="mt-3"></div>
-        <div id="workflowResults" class="mt-3"></div>
-      </div>
-    </div>
-  `);
-  
-  // Handle start button click
-  $("#startWorkflowBtn").on("click", async function() {
-    const initialInput = $("#workflowInput").val().trim();
-    
-    if (!initialInput) {
-      showNotification("Please provide input for the workflow", "warning");
-      return;
-    }
-    
-    // Disable the button and show progress
-    $(this).prop("disabled", true).text("Running...");
-    $(".progress").show();
-    
-    try {
-      let currentInput = initialInput;
-      let stepResults = [];
-      
-      // Process each step sequentially
-      for (let i = 0; i < steps.length; i++) {
-        const step = steps[i];
-        const progress = Math.round(((i + 1) / steps.length) * 100);
-        
-        // Update progress bar
-        $(".progress-bar").css("width", progress + "%");
-        
-        // Update status
-        $("#workflowStatus").html(`<div class="alert alert-info">Processing step ${i + 1} of ${steps.length}...</div>`);
-        
-        // Get the action for this step
-        const action = await getActionById(step.actionId);
-        
-        if (!action) {
-          stepResults.push({
-            stepIndex: i,
-            success: false,
-            error: `Action with ID ${step.actionId} not found`
-          });
-          continue;
-        }
-        
-        // Determine input for this step
-        let stepInput;
-        
-        switch (step.inputSource) {
-          case "original":
-            stepInput = initialInput;
-            break;
-          case "custom":
-            // Replace {previous} placeholders in custom input
-            stepInput = step.customInput.replace(/{previous}/g, currentInput);
-            break;
-          case "previous":
-          default:
-            stepInput = currentInput;
-            break;
-        }
-        
-        // Process the step
-        try {
-          const processedPrompt = action.prompt.replace(/{content}/g, stepInput || "");
-          const result = await callOpenAiApi(processedPrompt, action, stepInput);
-          
-          // Store the result
-          stepResults.push({
-            stepIndex: i,
-            success: true,
-            action: action.title,
-            input: stepInput,
-            output: result
-          });
-          
-          // Update current input for the next step
-          currentInput = result;
-        } catch (error) {
-          stepResults.push({
-            stepIndex: i,
-            success: false,
-            action: action.title,
-            error: error.message || "An error occurred"
-          });
-        }
-      }
-      
-      // Show results
-      renderWorkflowResults(stepResults);
-      
-      // Reset button
-      $("#startWorkflowBtn").prop("disabled", false).text("Run Again");
-      
-    } catch (error) {
-      $("#workflowStatus").html(`
-        <div class="alert alert-danger">
-          <strong>Error:</strong> ${error.message || "An unexpected error occurred"}
-        </div>
-      `);
-      
-      // Reset button
-      $("#startWorkflowBtn").prop("disabled", false).text("Try Again");
-    }
-  });
-}
-
-// Get action by ID (returns a promise)
-function getActionById(id) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction("actions", "readonly");
-    const store = transaction.objectStore("actions");
-    
-    const request = store.get(parseInt(id));
-    
-    request.onsuccess = function(e) {
-      resolve(e.target.result);
-    };
-    
-    request.onerror = function(e) {
-      reject(e.target.error);
-    };
-  });
-}
-
-// Render workflow results
-function renderWorkflowResults(results) {
-  let html = `
-    <h5 class="mt-4">Workflow Results</h5>
-    <div class="accordion" id="workflowStepsAccordion">
-  `;
-  
-  results.forEach((result, index) => {
-    const stepSuccess = result.success;
-    const stepTitle = `Step ${result.stepIndex + 1}${result.action ? ': ' + result.action : ''}`;
-    
-    html += `
-      <div class="card">
-        <div class="card-header" id="heading${index}">
-          <h2 class="mb-0">
-            <button class="btn btn-link btn-block text-left ${stepSuccess ? '' : 'text-danger'}" type="button" 
-                    data-toggle="collapse" data-target="#collapse${index}" aria-expanded="${index === results.length - 1}" 
-                    aria-controls="collapse${index}">
-              ${stepTitle}
-              ${stepSuccess ? 
-                '<span class="badge badge-success float-right">Success</span>' : 
-                '<span class="badge badge-danger float-right">Failed</span>'}
-            </button>
-          </h2>
-        </div>
-        
-        <div id="collapse${index}" class="collapse ${index === results.length - 1 ? 'show' : ''}" 
-             aria-labelledby="heading${index}" data-parent="#workflowStepsAccordion">
-          <div class="card-body">
-            ${stepSuccess ? 
-              `<div class="mb-2">
-                <h6>Input:</h6>
-                <pre class="bg-light p-2 border rounded">${result.input}</pre>
-              </div>
-              <div>
-                <h6>Output:</h6>
-                <pre class="bg-light p-2 border rounded">${result.output}</pre>
-                <div class="btn-group mt-2">
-                  <button class="btn btn-sm btn-outline-primary copy-workflow-result-btn" data-result="${encodeURIComponent(result.output)}">
-                    <i class="fas fa-copy"></i> Copy
-                  </button>
-                  <button class="btn btn-sm btn-outline-success save-workflow-result-btn" data-result="${encodeURIComponent(result.output)}">
-                    <i class="fas fa-save"></i> Save as Paragraph
-                  </button>
-                </div>
-              </div>` : 
-              `<div class="alert alert-danger">
-                <strong>Error:</strong> ${result.error}
-              </div>`
-            }
-          </div>
-        </div>
-      </div>
-    `;
-  });
-  
-  html += `</div>`;
-  
-  $("#workflowResults").html(html);
-  
-  // Update status
-  $("#workflowStatus").html(`
-    <div class="alert ${allStepsSucceeded(results) ? 'alert-success' : 'alert-warning'}">
-      <strong>Workflow completed</strong> with ${countSuccessfulSteps(results)} of ${results.length} steps successful.
-    </div>
-  `);
-  
-  // Set up event handlers for copy and save buttons
-  $(".copy-workflow-result-btn").on("click", function() {
-    const result = decodeURIComponent($(this).data("result"));
-    copyTextToClipboard(result);
-  });
-  
-  $(".save-workflow-result-btn").on("click", function() {
-    const result = decodeURIComponent($(this).data("result"));
-    saveResultAsParagraph(result);
-  });
-}
-
-// Check if all steps succeeded
-function allStepsSucceeded(results) {
-  return results.every(result => result.success);
-}
-
-// Count successful steps
-function countSuccessfulSteps(results) {
-  return results.filter(result => result.success).length;
 }
