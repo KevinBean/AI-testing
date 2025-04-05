@@ -2,27 +2,75 @@
 
 let editingWorkflowId = null;
 
-$(document).ready(function() {
-  // Add workflow step button
-  $("#addWorkflowStepBtn").on("click", function() {
-    addWorkflowStep();
-  });
+// Make sure we have jQuery and bind the event as soon as possible
+function initWorkflowBindings() {
+  console.log("Initializing workflow bindings...");
   
-  // Cancel workflow button
-  $("#cancelWorkflowBtn").on("click", function() {
+  if (typeof $ === 'undefined') {
+    console.error("jQuery not available yet - will try again in 500ms");
+    setTimeout(initWorkflowBindings, 500);
+    return;
+  }
+  
+  console.log("jQuery available, binding events");
+  
+  // Add workflow step button - using direct DOM approach first
+  const addBtn = document.getElementById('addWorkflowStepBtn');
+  if (addBtn) {
+    console.log("Add Workflow Step button found in DOM");
+    addBtn.addEventListener('click', function() {
+      console.log("Add workflow step button clicked (DOM event)");
+      addWorkflowStep();
+    });
+  } else {
+    console.warn("Add Workflow Step button not found in DOM directly");
+  }
+  
+  // Also try jQuery binding approach
+  if ($("#addWorkflowStepBtn").length) {
+    console.log("Add Workflow Step button found via jQuery");
+    
+    // Unbind first to avoid duplicate handlers
+    $("#addWorkflowStepBtn").off('click').on('click', function() {
+      console.log("Add workflow step button clicked (jQuery event)");
+      addWorkflowStep();
+    });
+  } else {
+    console.warn("Add Workflow Step button not found via jQuery");
+  }
+  
+  // Other button bindings
+  $("#cancelWorkflowBtn").off('click').on('click', function() {
+    console.log("Cancel workflow button clicked");
     resetWorkflowForm();
   });
   
-  // Search workflows
-  $("#workflowSearch").on("keyup", function() {
+  $("#workflowSearch").off('keyup').on('keyup', function() {
     const searchTerm = $(this).val().trim();
     loadWorkflows(searchTerm);
   });
   
-  // Workflow form submission
-  $("#workflowForm").on("submit", function(e) {
+  $("#workflowForm").off('submit').on('submit', function(e) {
     e.preventDefault();
+    console.log("Workflow form submitted");
     handleWorkflowFormSubmit();
+  });
+  
+  console.log("Workflow bindings initialized");
+}
+
+// Call initialization immediately
+initWorkflowBindings();
+
+// Also add it to document ready
+$(document).ready(function() {
+  console.log("Document ready, initializing workflow bindings");
+  initWorkflowBindings();
+  
+  // Load workflows when the tab is shown
+  $('a[data-toggle="tab"][href="#workflowsView"]').on('shown.bs.tab', function (e) {
+    console.log("Workflows tab shown");
+    loadWorkflows();
   });
 });
 
@@ -82,25 +130,78 @@ function loadWorkflows(searchTerm = "") {
 
 // Add a new workflow step to the form
 function addWorkflowStep() {
-  // Fetch available actions to populate the dropdown
-  const transaction = db.transaction("actions", "readonly");
-  const store = transaction.objectStore("actions");
-  const actions = [];
+  console.log("addWorkflowStep function called");
   
-  store.openCursor().onsuccess = function(e) {
-    const cursor = e.target.result;
-    if (cursor) {
-      actions.push(cursor.value);
-      cursor.continue();
-    } else {
+  // Debugging display
+  $("#debug-info").show().html('<div class="alert alert-info">Loading actions...</div>');
+  
+  // Remove the empty steps message if it exists
+  $("#emptyStepsMessage").remove();
+  
+  // Show loading indicator
+  $("#workflowSteps").append('<div class="text-center py-2" id="loading-actions"><i class="fas fa-spinner fa-spin"></i> Loading actions...</div>');
+  
+  try {
+    // Check if db is defined
+    if (!window.db) {
+      throw new Error("Database not initialized");
+    }
+    
+    // Create a promise-based wrapper for the IndexedDB transaction
+    const getActionsPromise = new Promise((resolve, reject) => {
+      try {
+        const actions = [];
+        const transaction = db.transaction("actions", "readonly");
+        const store = transaction.objectStore("actions");
+        
+        console.log("Fetching actions from database...");
+        const request = store.openCursor();
+        
+        request.onsuccess = function(e) {
+          const cursor = e.target.result;
+          if (cursor) {
+            actions.push(cursor.value);
+            cursor.continue();
+          } else {
+            console.log(`Found ${actions.length} actions`);
+            resolve(actions);
+          }
+        };
+        
+        request.onerror = function(e) {
+          console.error("Error accessing actions store:", e.target.error);
+          reject(e.target.error);
+        };
+        
+        transaction.onerror = function(e) {
+          console.error("Transaction error:", e.target.error);
+          reject(e.target.error);
+        };
+      } catch (error) {
+        console.error("Exception in getActionsPromise:", error);
+        reject(error);
+      }
+    });
+  
+    // Process the results from the promise
+    getActionsPromise.then(actions => {
+      // Remove the loading indicator
+      $("#loading-actions").remove();
+      $("#debug-info").html(`<div class="alert alert-success">Successfully loaded ${actions.length} actions</div>`);
+      
       if (actions.length === 0) {
-        showNotification("Please create at least one action first", "warning");
+        $("#workflowSteps").append(`
+          <div class="alert alert-warning">
+            <strong>No actions available!</strong> Please create at least one action first.
+            <a href="#actionsView" class="alert-link" data-toggle="tab">Go to Actions</a>
+          </div>
+        `);
         return;
       }
       
       // Create options for action selection
       let actionOptions = actions.map(action => 
-        `<option value="${action.id}">${action.title}</option>`
+        `<option value="${action.id}">${action.title || 'Untitled Action'}</option>`
       ).join('');
       
       const stepIndex = $("#workflowSteps .workflow-step").length;
@@ -187,10 +288,35 @@ function addWorkflowStep() {
         if (confirm("Are you sure you want to remove this step?")) {
           $(this).closest(".workflow-step").remove();
           updateStepNumbers();
+          
+          // If no steps remain, add the empty message back
+          if ($("#workflowSteps .workflow-step").length === 0) {
+            $("#workflowSteps").append('<p class="text-muted text-center my-3" id="emptyStepsMessage">No steps added yet. Click "Add Step" to begin.</p>');
+          }
         }
       });
-    }
-  };
+    }).catch(error => {
+      $("#loading-actions").remove();
+      $("#debug-info").show().html(`<div class="alert alert-danger">Error: ${error.message}</div>`);
+      
+      $("#workflowSteps").append(`
+        <div class="alert alert-danger">
+          <strong>Error:</strong> ${error.message || "Failed to load actions. Please try again."}
+        </div>
+      `);
+      console.error("Error in addWorkflowStep:", error);
+    });
+  } catch (error) {
+    $("#loading-actions").remove();
+    $("#debug-info").show().html(`<div class="alert alert-danger">Exception: ${error.message}</div>`);
+    
+    $("#workflowSteps").append(`
+      <div class="alert alert-danger">
+        <strong>Exception:</strong> ${error.message || "An unexpected error occurred"}
+      </div>
+    `);
+    console.error("Exception in addWorkflowStep:", error);
+  }
 }
 
 // Update step numbers after reordering

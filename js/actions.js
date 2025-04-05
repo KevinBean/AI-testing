@@ -768,6 +768,11 @@ async function assembleContentFromSelectedItems() {
   // Wait for all paragraphs and their referenced blocks
   const paragraphs = await Promise.all(paragraphFetchPromises);
   for (const para of paragraphs) {
+    if (para.error) {
+      contentParts.push(`# Error fetching paragraph\n\n${para.text || "Unknown error"}`);
+      continue;
+    }
+    
     contentParts.push(`# Paragraph ${para.paragraphNumber} from "${para.docTitle}"\n\n${para.text || ""}`);
     
     // Add referenced blocks for this paragraph
@@ -1180,6 +1185,9 @@ async function callOpenAiApi(prompt, action, content) {
   try {
     // Fetch the API key from localStorage if not already defined
     const openaiApiKey = localStorage.getItem('openai_api_key');
+    
+    // Set it as a global variable so workflows can access it
+    window.openaiApiKey = openaiApiKey;
     
     // Check if API key exists
     if (!openaiApiKey) {

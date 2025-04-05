@@ -123,5 +123,36 @@
   <script src="js/app.js"></script>
   <!-- Debug script for actions -->
   <script src="js/debug-actions.js"></script>
+
+  <script>
+    // Global initialization to ensure proper event binding across tabs
+    $(document).ready(function() {
+      console.log("Document ready in index.html");
+      
+      // Make sure workflow tab is properly initialized
+      $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+        const target = $(e.target).attr("href");
+        console.log("Tab shown:", target);
+        
+        // When workflows tab is activated
+        if (target === "#workflowsView") {
+          console.log("Workflow tab activated - ensuring bindings");
+          
+          // Check if our init function exists and call it
+          if (typeof initWorkflowBindings === 'function') {
+            initWorkflowBindings();
+          }
+          
+          // Directly bind to the button again
+          $("#addWorkflowStepBtn").off('click').on('click', function() {
+            console.log("Add step button clicked from direct tab binding");
+            if (typeof addWorkflowStep === 'function') {
+              addWorkflowStep();
+            }
+          });
+        }
+      });
+    });
+  </script>
 </body>
 </html>

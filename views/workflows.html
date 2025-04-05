@@ -43,17 +43,58 @@
           </div>
           <div class="form-group">
             <label for="workflowSteps">Workflow Steps</label>
-            <div id="workflowSteps" class="border rounded p-2 mb-2">
+            <div id="workflowSteps" class="border rounded p-2 mb-2 min-height-100">
               <!-- Steps will be added here -->
+              <p class="text-muted text-center my-3" id="emptyStepsMessage">No steps added yet. Click "Add Step" to begin.</p>
             </div>
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="addWorkflowStepBtn">
-              <i class="fas fa-plus"></i> Add Step
-            </button>
+            <div class="d-flex justify-content-between">
+              <button type="button" class="btn btn-sm btn-outline-secondary" id="addWorkflowStepBtn" onclick="console.log('Button clicked via inline handler');">
+                <i class="fas fa-plus"></i> Add Step
+              </button>
+              <small class="text-muted">You must have actions created to add steps</small>
+            </div>
+            <div id="debug-info" class="mt-2 small text-muted">
+              <button type="button" class="btn btn-sm btn-info" onclick="checkButtonBindings()">Check Button Bindings</button>
+            </div>
           </div>
-          <button type="submit" id="saveWorkflowBtn" class="btn btn-primary">Save Workflow</button>
-          <button type="button" id="cancelWorkflowBtn" class="btn btn-secondary">Clear</button>
+          <div class="mt-3">
+            <button type="submit" id="saveWorkflowBtn" class="btn btn-primary">Save Workflow</button>
+            <button type="button" id="cancelWorkflowBtn" class="btn btn-secondary">Clear</button>
+          </div>
         </form>
       </div>
     </div>
   </div>
 </div>
+
+<style>
+  .min-height-100 {
+    min-height: 100px;
+  }
+</style>
+
+<script>
+  // Helper function to check if button has event handlers
+  function checkButtonBindings() {
+    if (typeof jQuery !== 'undefined') {
+      console.log("jQuery is loaded");
+      const btn = document.getElementById('addWorkflowStepBtn');
+      console.log("Button exists:", btn !== null);
+      
+      if (btn) {
+        console.log("Button ID:", btn.id);
+        console.log("Button text:", btn.innerText.trim());
+      }
+      
+      // Try to manually trigger the click
+      console.log("Attempting to trigger click via jQuery...");
+      try {
+        $("#addWorkflowStepBtn").trigger('click');
+      } catch(e) {
+        console.error("Error triggering click:", e);
+      }
+    } else {
+      console.error("jQuery is not loaded!");
+    }
+  }
+</script>
