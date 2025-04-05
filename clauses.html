@@ -47,6 +47,15 @@
       .preview-col { order: 1; }
       .editor-col  { order: 2; }
     }
+
+    .highlight-paragraph {
+      animation: highlight-fade 3s;
+    }
+    
+    @keyframes highlight-fade {
+      0% { background-color: rgba(255, 255, 0, 0.5); }
+      100% { background-color: transparent; }
+    }
   </style>
 </head>
 <body>
@@ -95,6 +104,8 @@
             <ul id="blockList" class="list-group"></ul>
           </div>
           <div class="col-md-5 preview-col">
+            <!-- Block Details View Container -->
+            <div id="blockDetailView" style="display:none; margin-bottom:15px;"></div>
             <!-- Middle column (preview) -->
           </div>
           <div class="col-md-4 editor-col">
@@ -1035,6 +1046,12 @@
               display += "]</span>";
             }
             const li = $("<li>").addClass("list-group-item list-item").html(display);
+            
+            // New: make the entire list item clickable to show linked paragraphs
+            li.on("click", function() {
+              showBlockDetails(block);
+            });
+            
             const editBtn = $("<button>")
               .addClass("btn btn-sm btn-warning action-btn")
               .text("Edit")
@@ -1043,6 +1060,7 @@
               .addClass("btn btn-sm btn-danger action-btn")
               .text("Delete")
               .click(function(e){ e.stopPropagation(); deleteBlock(block.id); });
+              
             li.append(editBtn, delBtn);
             $("#blockList").append(li);
           }
@@ -1070,6 +1088,35 @@
         store.delete(id).onsuccess = function() {
           loadBlocks();
           updateBlockAutocomplete();
+        };
+      }
+    }
+
+    // New universal method to edit a block from anywhere in the UI
+    function editBlockUniversal(blockId) {
+      if (blockId) {
+        const transaction = db.transaction("blocks", "readonly");
+        const store = transaction.objectStore("blocks");
+        
+        store.get(parseInt(blockId)).onsuccess = function(e) {
+          const block = e.target.result;
+          if (block) {
+            // Switch to blocks tab
+            $('#viewTabs a[href="#blocksView"]').tab('show');
+            
+            // Edit the block
+            editBlock(block);
+            
+            // Hide any block detail view that might be open
+            $("#blockDetailView").hide();
+            
+            // Scroll to the edit form
+            $('html, body').animate({
+              scrollTop: $("#blockForm").offset().top - 100
+            }, 500);
+          } else {
+            showNotification(`Block with ID ${blockId} not found`, "warning");
+          }
         };
       }
     }
@@ -1281,6 +1328,7 @@
                   html += "<strong>" + block.stdLevels.join(".") + "</strong>";
                 }
                 html += ": <strong>" + (block.title || "Block " + block.id) + "</strong> - " + marked.parse(block.text);
+                html += `<button class="btn btn-sm btn-warning edit-std-block-btn ml-2" data-block-id="${block.id}">Edit</button>`;
                 html += "</li>";
               });
               html += "</ul>";
@@ -1289,6 +1337,12 @@
             }
             
             $("#standardCombined").html(html);
+
+            // Add event handler after HTML is inserted
+            $(".edit-std-block-btn").on("click", function() {
+              const blockId = $(this).data("block-id");
+              editBlockUniversal(blockId);
+            });
           };
         }
       };
@@ -1438,9 +1492,12 @@
             <li class="list-group-item">
               <div>
                 ${levelStr}<strong>${block.title || 'Block ' + block.id}</strong> (ID: ${block.id})
-                <button class="btn btn-sm btn-outline-info float-right preview-ref-block-btn" data-block-id="${block.id}">
-                  <i class="fas fa-eye-slash"></i> Hide Content
-                </button>
+                <div class="btn-group float-right">
+                  <button class="btn btn-sm btn-warning edit-ref-block-btn" data-block-id="${block.id}">Edit</button>
+                  <button class="btn btn-sm btn-outline-info preview-ref-block-btn" data-block-id="${block.id}">
+                    <i class="fas fa-eye-slash"></i> Hide Content
+                  </button>
+                </div>
               </div>
               <div class="block-preview-container-${block.id} mt-2">
                 <div class="card">
@@ -1471,6 +1528,12 @@
         combineStandard(refId);
         // Switch to the references tab
         $("#standards-tab").tab('show');
+      });
+      
+      // Add event listeners to block edit buttons
+      $(".edit-ref-block-btn").on("click", function() {
+        const blockId = $(this).data("block-id");
+        editBlockUniversal(blockId);
       });
       
       // Add event listeners to block preview buttons
@@ -1772,8 +1835,13 @@
 
     $("#livePreviewBtn").on("click", function() {
       let previewHTML = "<h4>" + $("#docTitle").val() + "</h4>";
+      let paragraphPreviews = [];
+      let pendingPreviews = 0;
+      
       $(".paragraph-block").each(function(i) {
         const content = $(this).find(".docParagraph").val();
+        
+        // Get all block references in this paragraph
         const blockRefs = [];
         $(this).find(".blockRef").each(function() {
           const refVal = $(this).val().trim();
@@ -1782,11 +1850,14 @@
           }
         });
         
+        // Get paragraph tags
+        const tagsStr = $(this).find(".paraTags").val();
+        const tags = tagsStr ? tagsStr.split(/,\s*/).filter(t => t.trim()) : [];
+        
+        // Start building the paragraph HTML
         let paragraphHTML = `<div class="mb-3"><p><strong>Paragraph ${i+1}:</strong></p>${marked.parse(content)}`;
         
         // Display paragraph tags if present
-        const tagsStr = $(this).find(".paraTags").val();
-        const tags = tagsStr ? tagsStr.split(/,\s*/).filter(t => t.trim()) : [];
         if(tags.length) {
           paragraphHTML += `<p><small>Tags: ${tags.map(t => `<span class="badge badge-info">${t}</span>`).join(' ')}</small></p>`;
         }
@@ -1798,6 +1869,7 @@
           let blockHTML = '';
           let blocksProcessed = 0;
           
+          // Increment pending previews counter for this paragraph's blocks
           pendingPreviews += blockRefs.length;
           
           blockRefs.forEach(function(blockRef) {
@@ -1809,21 +1881,31 @@
                   (block.standard ? ` <span class="block-standard">[Standard: ${block.standard}` +
                   (block.stdLevels && block.stdLevels.length > 0 ? " " + block.stdLevels.join(".") : "") + `]</span>` : "") + 
                   (block.tags && block.tags.length ? ` <small>[Tags: ${block.tags.join(", ")}]</small>` : "") +
-                  `</p>`;
+                  `<button class="btn btn-sm btn-warning edit-preview-block-btn ml-2" data-block-id="${block.id}">Edit</button></p>`;
               } else {
-                blockHTML += `<p class="text-danger">Block not found</p>`;
+                blockHTML += `<p class="text-danger">Block with ID ${blockRef} not found</p>`;
               }
               
               blocksProcessed++;
               
               if(blocksProcessed === blockRefs.length) {
                 paragraphHTML += blockHTML + "</div>";
+                
+                // Store the paragraph HTML at the correct index
                 paragraphPreviews[paragraphIndex] = paragraphHTML;
                 pendingPreviews -= blockRefs.length;
                 
                 // Once all previews are done, update the preview content
                 if(pendingPreviews === 0) {
-                  $("#docPreviewContent").html(previewHTML + paragraphPreviews.join(''));
+                  // Filter out any undefined entries and join the previews
+                  const filteredPreviews = paragraphPreviews.filter(p => p !== undefined);
+                  $("#docPreviewContent").html(previewHTML + filteredPreviews.join(''));
+
+                  // Add event handler for edit buttons
+                  $("#docPreviewContent").find(".edit-preview-block-btn").on("click", function() {
+                    const blockId = $(this).data("block-id");
+                    editBlockUniversal(blockId);
+                  });
                 }
               }
             });
@@ -1834,9 +1916,11 @@
         }
       });
       
-      // If there are no block references, update preview immediately
+      // If there are no block references at all, update preview immediately
       if(pendingPreviews === 0) {
-        $("#docPreviewContent").html(previewHTML + paragraphPreviews.join(''));
+        // Filter out any undefined entries and join the previews
+        const filteredPreviews = paragraphPreviews.filter(p => p !== undefined);
+        $("#docPreviewContent").html(previewHTML + filteredPreviews.join(''));
       }
     });
 
@@ -1979,10 +2063,17 @@
               (block.standard ? ` <span class="block-standard">[Standard: ${block.standard}` +
               (block.stdLevels && block.stdLevels.length > 0 ? " " + block.stdLevels.join(".") : "") + `]</span>` : "") + 
               (block.tags && block.tags.length ? ` <small>[Tags: ${block.tags.join(", ")}]</small>` : "") +
-              `</p>` : `<p class="text-danger">Block not found</p>`;
+              `<button class="btn btn-sm btn-warning edit-doc-block-btn ml-2" data-block-id="${block.id}">Edit</button></p>` : `<p class="text-danger">Block not found</p>`;
             $("#docPreviewContent").html(html);
+            
+            // Add event handler for edit buttons
+            $(".edit-doc-block-btn").on("click", function() {
+              const blockId = $(this).data("block-id");
+              editBlockUniversal(blockId);
+            });
           });
         }
+        
         html += "</div>";
       });
       $("#docPreviewContent").html(html);
@@ -2298,6 +2389,159 @@
       };
     }
 
+    // Function to find all paragraphs referencing a specific block
+    function findParagraphsReferencingBlock(blockId, callback) {
+      const referencingParagraphs = [];
+      const transaction = db.transaction("documents", "readonly");
+      const store = transaction.objectStore("documents");
+      
+      store.openCursor().onsuccess = function(e) {
+        const cursor = e.target.result;
+        if (cursor) {
+          const doc = cursor.value;
+          
+          if (doc.paragraphs && doc.paragraphs.length > 0) {
+            doc.paragraphs.forEach((para, paraIndex) => {
+              // Check both old (blockRef) and new (blockRefs) formats
+              const blockRefs = para.blockRefs || (para.blockRef ? [para.blockRef] : []);
+              
+              if (blockRefs.includes(blockId)) {
+                referencingParagraphs.push({
+                  docId: doc.id,
+                  docTitle: doc.title,
+                  paraIndex: paraIndex,
+                  content: para.content.substring(0, 100) + (para.content.length > 100 ? '...' : '')
+                });
+              }
+            });
+          }
+          cursor.continue();
+        } else {
+          // All documents have been processed
+          callback(referencingParagraphs);
+        }
+      };
+    }
+
+    // Enhanced function to show block details with referencing paragraphs
+    function showBlockDetails(block) {
+      let renderedText = marked.parse(block.text);
+      const title = block.title || "Block " + block.id;
+      
+      let html = `
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>${title}</strong> (ID: ${block.id})
+            <div class="btn-group float-right">
+              <button class="btn btn-sm btn-warning edit-block-btn" data-block-id="${block.id}">Edit</button>
+              <button class="btn btn-sm btn-outline-secondary close-block-details">Close</button>
+            </div>
+          </div>
+          <div class="card-body">
+            ${renderedText}
+            
+            ${block.tags && block.tags.length ? 
+              `<div class="mt-2">Tags: ${block.tags.map(t => `<span class="badge badge-info mr-1">${t}</span>`).join('')}</div>` : ''}
+            
+            ${block.standard ? 
+              `<div class="mt-2">Standard: ${block.standard} ${block.stdLevels && block.stdLevels.length > 0 ? 
+                block.stdLevels.join(".") : ""}</div>` : ''}
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="card-header">Paragraphs Referencing This Block</div>
+          <div class="card-body" id="referencingParagraphsList">
+            <div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading references...</div>
+          </div>
+        </div>
+      `;
+      
+      // Insert the HTML into a modal or container
+      $("#blockDetailView").html(html).show();
+      
+      // Set up close button handler
+      $(".close-block-details").on("click", function() {
+        $("#blockDetailView").hide();
+      });
+      
+      // Set up edit button handler
+      $(".edit-block-btn").on("click", function() {
+        editBlockUniversal($(this).data("block-id"));
+      });
+      
+      // Find and display paragraphs that reference this block
+      findParagraphsReferencingBlock(block.id, function(references) {
+        const refList = $("#referencingParagraphsList");
+        
+        if (references.length === 0) {
+          refList.html('<p class="text-muted">No paragraphs are referencing this block.</p>');
+          return;
+        }
+        
+        let listHtml = '<ul class="list-group">';
+        references.forEach(ref => {
+          listHtml += `
+            <li class="list-group-item">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <strong>Document:</strong> ${ref.docTitle} 
+                  <br><strong>Paragraph:</strong> ${ref.paraIndex + 1}
+                  <br>${marked.parse(ref.content)}
+                </div>
+                <button class="btn btn-sm btn-outline-primary view-document-btn" 
+                        data-doc-id="${ref.docId}" data-para-index="${ref.paraIndex}">
+                  View
+                </button>
+              </div>
+            </li>
+          `;
+        });
+        listHtml += '</ul>';
+        
+        refList.html(listHtml);
+        
+        // Add click handler for view buttons
+        $(".view-document-btn").click(function() {
+          const docId = $(this).data("doc-id");
+          const paraIndex = $(this).data("para-index");
+          
+          // Load and display the document
+          fetchDocumentById(docId, function(doc) {
+            if (doc) {
+              previewDocument(doc);
+              $("#blockDetailView").hide();
+              // Switch to the documents tab
+              $('#viewTabs a[href="#documentsView"]').tab('show');
+              
+              // Highlight the referenced paragraph (optional)
+              setTimeout(() => {
+                const paraElement = $("#docPreviewContent .mb-3").eq(paraIndex);
+                if (paraElement.length) {
+                  paraElement.addClass("highlight-paragraph");
+                  $('html, body').animate({
+                    scrollTop: paraElement.offset().top - 100
+                  }, 500);
+                  setTimeout(() => paraElement.removeClass("highlight-paragraph"), 3000);
+                }
+              }, 500);
+            }
+          });
+        });
+      });
+    }
+
+    function deleteDocument(id) {
+      if(confirm("Are you sure you want to delete this document?")) {
+        const transaction = db.transaction("documents", "readwrite");
+        const store = transaction.objectStore("documents");
+        store.delete(id).onsuccess = function() {
+          showNotification("Document deleted successfully!");
+          loadDocuments();
+        };
+      }
+    }
+
     /**********************
      * Tags Management
      **********************/
@@ -2382,12 +2626,24 @@
                 <div class="card-body">
                   <h6>${block.title || 'Block'} (ID: ${block.id})</h6>
                   <div>${renderedText}</div>
-                  <div class="mt-2">
-                    ${block.tags.map(t => `<span class="badge badge-info mr-1">${t}</span>`).join('')}
+                  <div class="mt-2 d-flex justify-content-between">
+                    <div>
+                      ${block.tags.map(t => `<span class="badge badge-info mr-1">${t}</span>`).join('')}
+                    </div>
+                    <div>
+                      <button class="btn btn-sm btn-warning edit-tag-block-btn" data-block-id="${block.id}">Edit</button>
+                    </div>
                   </div>
                 </div>
               </div>
             `);
+            
+            // Add event handler for the edit button
+            blockItem.find(".edit-tag-block-btn").on("click", function() {
+              const blockId = $(this).data("block-id");
+              editBlockUniversal(blockId);
+            });
+            
             blocksList.append(blockItem);
           }
           cursor.continue();
