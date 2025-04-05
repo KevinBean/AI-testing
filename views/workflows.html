@@ -1,0 +1,59 @@
+<div class="row">
+  <div class="col-md-3">
+    <div class="mb-2">
+      <input type="text" id="workflowSearch" class="form-control" placeholder="Search workflows...">
+      <small class="form-text text-muted">Search by name or description</small>
+    </div>
+    <div class="section-title">Saved Workflows</div>
+    <ul id="workflowList" class="list-group"></ul>
+  </div>
+  <div class="col-md-5 preview-col">
+    <div class="card mb-4">
+      <div class="card-header">Workflow Preview</div>
+      <div class="card-body">
+        <div id="workflowPreview" class="border p-3">
+          <p class="text-muted">Select a workflow to preview its steps and configuration.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">Workflow Testing</div>
+      <div class="card-body">
+        <div id="workflowResultContainer" class="mt-3">
+          <div class="alert alert-info">Results will appear here after running the workflow.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4 editor-col">
+    <div class="card mb-4">
+      <div class="card-header">Workflow Configuration</div>
+      <div class="card-body">
+        <div class="help-tip mb-3">
+          <p><strong>What are Workflows?</strong> Workflows are sequences of actions that can be run together. Create pipelines of AI operations to process your content.</p>
+        </div>
+        <form id="workflowForm">
+          <div class="form-group">
+            <label for="workflowName">Workflow Name</label>
+            <input type="text" class="form-control" id="workflowName" required>
+          </div>
+          <div class="form-group">
+            <label for="workflowDesc">Description</label>
+            <textarea class="form-control" id="workflowDesc" rows="2"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="workflowSteps">Workflow Steps</label>
+            <div id="workflowSteps" class="border rounded p-2 mb-2">
+              <!-- Steps will be added here -->
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="addWorkflowStepBtn">
+              <i class="fas fa-plus"></i> Add Step
+            </button>
+          </div>
+          <button type="submit" id="saveWorkflowBtn" class="btn btn-primary">Save Workflow</button>
+          <button type="button" id="cancelWorkflowBtn" class="btn btn-secondary">Clear</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

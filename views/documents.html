@@ -1,0 +1,330 @@
+<div class="row">
+  <div class="col-md-3">
+    <div class="mb-3">
+      <div class="input-group">
+        <input type="text" id="docSearch" class="form-control" placeholder="Search documents...">
+        <div class="input-group-append">
+          <button class="btn btn-primary" id="createDocumentButton" data-toggle="modal" data-target="#documentModal">
+            <i class="fas fa-plus"></i> New Document
+          </button>
+        </div>
+      </div>
+      <small class="form-text text-muted">Search by title, content, or tags</small>
+    </div>
+    <div class="section-title">Saved Documents</div>
+    <ul id="docList" class="list-group"></ul>
+  </div>
+  <div id="documentPreviewSection" class="col-md-9 preview-col">
+    <div id="docPreviewInline" class="border p-3 mt-3">
+      <h5 class="section-title d-flex justify-content-between">
+        <span>Document Preview</span>
+        <div class="btn-group btn-group-sm">
+          <button class="btn btn-outline-secondary" id="printDocBtn" title="Print document">
+            <i class="fas fa-print"></i>
+          </button>
+          <button class="btn btn-outline-secondary" id="expandAllBlocksBtn" title="Expand all blocks">
+            <i class="fas fa-expand-alt"></i>
+          </button>
+          <button class="btn btn-outline-secondary" id="collapseAllBlocksBtn" title="Collapse all blocks">
+            <i class="fas fa-compress-alt"></i>
+          </button>
+        </div>
+      </h5>
+      <div id="docPreviewContent" class="document-preview"></div>
+    </div>
+    <div id="documentReferencesList" class="border p-3 mt-3 mb-3"></div>
+  </div>
+  
+  <!-- Document Form Section - Moved from modal to main stage -->
+  <div id="documentFormSection" class="col-md-9" style="display: none;">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between">
+        <h5 id="documentFormTitle">Create New Document</h5>
+        <button type="button" class="close" id="closeDocumentForm">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="card-body">
+        <form id="documentForm">
+          <div class="form-group">
+            <label for="docTitle">Document Title</label>
+            <input type="text" id="docTitle" class="form-control" placeholder="Document Title" required>
+          </div>
+          <div class="section-title">Paragraphs <small>(Drag to reorder)</small></div>
+          <div id="paragraphContainer" class="mb-3">
+            <!-- Paragraph blocks added dynamically -->
+          </div>
+          <div class="btn-group mb-3">
+            <button type="button" id="addParagraphButton" class="btn btn-secondary">Add Paragraph</button>
+            <button type="button" id="livePreviewBtn" class="btn btn-info">Live Preview</button>
+          </div>
+          <div class="help-tip">
+            <p><strong>Tips:</strong> Use the autocomplete to reference blocks by ID. Drag paragraphs to reorder them.</p>
+          </div>
+        </form>
+      </div>
+      <div class="card-footer">
+        <button type="button" class="btn btn-secondary" id="cancelDocumentEdit">Cancel</button>
+        <button type="button" class="btn btn-primary" id="saveDocumentButton">Save Document</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Include document.js script explicitly -->
+<script src="../js/document.js"></script>
+
+<!-- Additional document handlers -->
+<script>
+  $(document).ready(function() {
+    // Create functions to access document functionality from other views
+    window.previewDocument = previewDocument;
+    window.loadBlockReferences = loadBlockReferences;
+    
+    // Initialize tooltips
+    $('[data-toggle="tooltip"]').tooltip();
+    
+    // Function to preview block references that can be called from other views
+    window.previewBlockReference = function(blockId, containerElement) {
+      fetchBlockById(parseInt(blockId), function(block) {
+        if(block) {
+          const previewHtml = `<div class="alert alert-info">
+            <strong>Block ${blockId}: ${block.title || ''}</strong> ${marked.parse(block.text || block.content || '')}
+            ${block.standard ? `<div><strong>Standard:</strong> ${block.standard} 
+            ${block.stdLevels && block.stdLevels.length > 0 ? block.stdLevels.join(".") : ""}</div>` : '' }
+            ${block.tags && block.tags.length ? `<div><strong>Tags:</strong> ${block.tags.join(", ")}</div>` : '' }
+          </div>`;
+          
+          containerElement.append(previewHtml);
+          setTimeout(() => {
+            containerElement.find(".alert").fadeOut('slow', function() {
+              $(this).remove();
+            });
+          }, 3000);
+        } else {
+          alert("Block not found!");
+        }
+      });
+    };
+    
+    // Function to inherit tags from blocks that can be called from other views
+    window.inheritTagsFromBlock = function(blockId, containerElement) {
+      fetchBlockById(parseInt(blockId), function(block) {
+        if(block && block.tags && block.tags.length) {
+          const paraTagsInput = containerElement.find(".paraTags");
+          const currentTags = paraTagsInput.val().split(/,\s*/).filter(t => t.trim());
+          
+          // Merge existing tags with block tags (no duplicates)
+          const mergedTags = [...new Set([...currentTags, ...block.tags])];
+          paraTagsInput.val(mergedTags.join(", "));
+          
+          showNotification("Tags inherited from block", "info");
+        } else {
+          alert("No tags found in the referenced block");
+        }
+      });
+    };
+    
+    // Function to generate a document preview
+    window.generateDocumentPreview = function() {
+      const title = $("#docTitle").val().trim();
+      
+      const paragraphs = [];
+      $(".paragraph-block").each(function() {
+        const paragraphTitle = $(this).find(".paragraphTitle").val().trim();
+        const content = $(this).find(".docParagraph").val();
+        
+        // Get paragraph tags
+        const tagsStr = $(this).find(".paraTags").val();
+        const tags = tagsStr ? tagsStr.split(/,\s*/).filter(t => t.trim()) : [];
+        
+        paragraphs.push({ 
+          title: paragraphTitle,
+          content, 
+          tags: tags 
+        });
+      });
+      
+      let previewHtml = `<h2>${title || 'Untitled Document'}</h2>`;
+      
+      paragraphs.forEach(paragraph => {
+        previewHtml += `<div class="preview-paragraph mb-4">
+          ${paragraph.title ? `<h4>${paragraph.title}</h4>` : ''}
+          <div class="paragraph-content">
+            ${marked.parse(paragraph.content || '')}
+          </div>
+          ${paragraph.tags && paragraph.tags.length ? 
+            `<div class="paragraph-tags">
+              ${paragraph.tags.map(tag => `<span class="badge badge-secondary mr-1">${tag}</span>`).join('')}
+            </div>` : ''}
+        </div>`;
+      });
+      
+      // Show in a modal or dedicated preview area
+      $("#docPreviewContent").html(previewHtml);
+    };
+    
+    // Show document form section instead of modal
+    $("#createDocumentButton").click(function() {
+      // Reset form and prepare for creating new document
+      $("#documentForm")[0].reset();
+      $("#documentFormTitle").text("Create New Document");
+      $("#paragraphContainer").empty();
+      addParagraph(); // Add an initial paragraph
+      editingDocumentId = null;
+      
+      // Hide preview and show form
+      $("#documentPreviewSection").hide();
+      $("#documentFormSection").show();
+    });
+    
+    // Handle cancel button
+    $("#cancelDocumentEdit, #closeDocumentForm").click(function() {
+      // Hide form and show preview
+      $("#documentFormSection").hide();
+      $("#documentPreviewSection").show();
+    });
+    
+    // Override edit document functionality
+    $(document).on("click", ".edit-document-btn", function(e) {
+      e.stopPropagation();
+      const docId = parseInt($(this).data("id"));
+      fetchDocumentById(docId, function(doc) {
+        if(doc) {
+          editDocument(doc);
+          // Hide preview and show form instead of showing modal
+          $("#documentPreviewSection").hide();
+          $("#documentFormSection").show();
+        }
+      });
+    });
+    
+    // Override save functionality
+    $("#saveDocumentButton").click(function(event) {
+      event.preventDefault();
+      
+      // Create a patched version of handleDocumentFormSubmit
+      const patchedHandleSubmit = function(e) {
+        if (e) e.preventDefault();
+        
+        // Database check
+        if (!db || db.version === null) {
+          showNotification("Database is not available. Please refresh the page.", "danger");
+          return;
+        }
+        
+        const title = $("#docTitle").val().trim();
+        
+        if (!title) {
+          showNotification("Document title is required", "warning");
+          return;
+        }
+        
+        // Gather paragraph data
+        const paragraphs = [];
+        $(".paragraph-block").each(function() {
+          const paragraphTitle = $(this).find(".paragraphTitle").val().trim();
+          const content = $(this).find(".docParagraph").val();
+          
+          // Collect all block references
+          const blockRefs = [];
+          $(this).find(".blockRef").each(function() {
+            const refVal = $(this).val().trim();
+            if (refVal) {
+              blockRefs.push(parseInt(refVal));
+            }
+          });
+          
+          // Get paragraph tags
+          const tagsStr = $(this).find(".paraTags").val();
+          const tags = tagsStr ? tagsStr.split(/,\s*/).filter(t => t.trim()) : [];
+          
+          paragraphs.push({ 
+            title: paragraphTitle,
+            content, 
+            blockRefs: blockRefs.length > 0 ? blockRefs : [],
+            tags: tags 
+          });
+        });
+        
+        try {
+          const transaction = db.transaction("documents", "readwrite");
+          const store = transaction.objectStore("documents");
+          
+          if (editingDocumentId) {
+            console.log("Updating document with ID:", editingDocumentId);
+            
+            store.get(editingDocumentId).onsuccess = function(e) {
+              const doc = e.target.result;
+              if (!doc) {
+                console.error("Document not found for ID:", editingDocumentId);
+                showNotification("Error: Document not found", "danger");
+                return;
+              }
+              
+              // Update the document properties
+              doc.title = title;
+              doc.paragraphs = paragraphs;
+              doc.updated = new Date();
+              
+              // Save the updated document
+              const updateRequest = store.put(doc);
+              
+              updateRequest.onsuccess = function() {
+                console.log("Document updated successfully");
+                showNotification("Document updated successfully!");
+                
+                // Hide form, show preview, reset state
+                $("#documentFormSection").hide();
+                $("#documentPreviewSection").show();
+                editingDocumentId = null;
+                $("#documentForm")[0].reset();
+                $("#paragraphContainer").empty();
+                loadDocuments();
+                
+                // Preview the updated document
+                previewDocument(doc.id);
+              };
+            };
+          } else {
+            // Add new document
+            const newDoc = { 
+              title, 
+              paragraphs, 
+              created: new Date() 
+            };
+            
+            const addRequest = store.add(newDoc);
+            
+            addRequest.onsuccess = function(event) {
+              const newId = event.target.result;
+              console.log("Document created successfully with ID:", newId);
+              showNotification("New document created!");
+              
+              // Hide form, show preview, reset state
+              $("#documentFormSection").hide();
+              $("#documentPreviewSection").show();
+              $("#documentForm")[0].reset();
+              $("#paragraphContainer").empty();
+              loadDocuments();
+              
+              // Preview the new document
+              if (newId) {
+                previewDocument(newId);
+              }
+            };
+          }
+        } catch (err) {
+          console.error("Database error:", err);
+          showNotification("Failed to save document. The database might be unavailable.", "danger");
+        }
+      };
+      
+      // Call our patched version
+      patchedHandleSubmit(event);
+    });
+    
+    // Hide the form section by default
+    $("#documentFormSection").hide();
+  });
+</script>

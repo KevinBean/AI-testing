@@ -1,0 +1,839 @@
+<div class="row">
+  <div class="col-md-3">
+    <div class="card mb-3">
+      <div class="card-header">
+        <h5 class="mb-0">Tag Explorer</h5>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <input type="text" id="tagSearch" class="form-control" placeholder="Search tags...">
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" id="showNestedTagsCheckbox" checked>
+          <label class="form-check-label" for="showNestedTagsCheckbox">
+            Show nested tag structure
+          </label>
+        </div>
+        <div id="tagCloud" class="mb-3 d-none"></div>
+        <div id="tagTreeContainer" class="mb-3">
+          <ul id="tagTree" class="tag-tree list-unstyled"></ul>
+        </div>
+        <div class="tag-statistics small text-muted">
+          <span id="tagCount">0 tags</span> • <span id="blocksTaggedCount">0 items tagged</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-9">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+          <span id="selectedTagTitle">All Tagged Content</span>
+          <span id="selectedTagBadge" class="badge badge-primary ml-2" style="display: none;"></span>
+        </h5>
+        <div>
+          <div class="btn-group btn-group-sm" role="group" aria-label="Content type filter">
+            <button type="button" class="btn btn-outline-secondary active" id="showAllContent" data-content-type="all">All</button>
+            <button type="button" class="btn btn-outline-secondary" id="showBlocksOnly" data-content-type="blocks">Blocks</button>
+            <button type="button" class="btn btn-outline-secondary" id="showDocsOnly" data-content-type="docs">Documents</button>
+          </div>
+          <button id="clearTagFilter" class="btn btn-sm btn-outline-danger ml-2" style="display: none;">
+            <i class="fas fa-times"></i> Clear Filter
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="taggedContentContainer" class="mb-3">
+          <div id="loadingContentMessage">Loading tags and content...</div>
+          
+          <div id="noTagsMessage" class="alert alert-info" style="display: none;">
+            No tags have been added yet. Add tags to your blocks or document paragraphs to see them here.
+          </div>
+          
+          <div id="noContentMessage" class="alert alert-info" style="display: none;">
+            No content found with this tag.
+          </div>
+          
+          <!-- Blocks section -->
+          <div id="blocksSection">
+            <h5 class="section-title" id="blocksSectionTitle" style="display: none;">Blocks</h5>
+            <div id="blocksByTagList"></div>
+          </div>
+          
+          <!-- Documents section -->
+          <div id="documentsSection">
+            <h5 class="section-title" id="documentsSectionTitle" style="display: none;">Documents</h5>
+            <div id="documentsByTagList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/tags.js"></script>
+
+<script>
+  $(document).ready(function() {
+    // Initialize the tags view
+    initializeTagsView();
+    
+    // Function to initialize the tags view
+    function initializeTagsView() {
+      console.log("Initializing tags view");
+      
+      // Load tags data
+      loadTagsData();
+      
+      // Set up tag search
+      $("#tagSearch").on("keyup", function() {
+        const searchTerm = $(this).val().trim().toLowerCase();
+        if (searchTerm === "") {
+          $(".tag-cloud-item").show();
+          $(".tag-tree-item").show();
+          $(".tag-category").show();
+        } else {
+          // Filter tree tags - show matches and their parent categories
+          $(".tag-tree-item").each(function() {
+            const tagText = $(this).text().toLowerCase();
+            const matches = tagText.includes(searchTerm);
+            $(this).toggle(matches);
+            
+            if (matches) {
+              // Show all parent categories
+              $(this).parents('.tag-category').show();
+            } else {
+              $(this).hide();
+            }
+          });
+          
+          // Hide empty categories after filtering
+          $(".tag-category").each(function() {
+            const hasVisibleChildren = $(this).find('.tag-tree-item:visible, .tag-category:visible').length > 0;
+            $(this).toggle(hasVisibleChildren);
+          });
+        }
+      });
+      
+      // Toggle between tag cloud and tree view
+      $("#showNestedTagsCheckbox").change(function() {
+        if ($(this).is(":checked")) {
+          $("#tagCloud").addClass("d-none");
+          $("#tagTreeContainer").removeClass("d-none");
+        } else {
+          $("#tagTreeContainer").addClass("d-none");
+          $("#tagCloud").removeClass("d-none");
+        }
+      });
+      
+      // Clear tag filter button
+      $("#clearTagFilter").on("click", function() {
+        window.appState.selectedTag = null;
+        $(this).hide();
+        $("#selectedTagBadge").hide();
+        $("#selectedTagTitle").text("All Tagged Content");
+        loadContentByTags();
+      });
+      
+      // Content type filter buttons
+      $(".btn-group[aria-label='Content type filter'] button").click(function() {
+        $(this).addClass('active').siblings().removeClass('active');
+        const contentType = $(this).data('content-type');
+        filterContentByType(contentType);
+      });
+    }
+    
+    // Function to filter content by type
+    function filterContentByType(contentType) {
+      switch(contentType) {
+        case 'blocks':
+          $('#blocksSection').show();
+          $('#documentsSection').hide();
+          break;
+        case 'docs':
+          $('#blocksSection').hide();
+          $('#documentsSection').show();
+          break;
+        case 'all':
+        default:
+          $('#blocksSection').show();
+          $('#documentsSection').show();
+          break;
+      }
+      
+      // If there's no content visible, show appropriate message
+      checkNoContentMessage();
+    }
+    
+    function checkNoContentMessage() {
+      const blocksVisible = $('#blocksSection').is(':visible') && $('#blocksByTagList').children().length > 0;
+      const docsVisible = $('#documentsSection').is(':visible') && $('#documentsByTagList').children().length > 0;
+      
+      if (!blocksVisible && !docsVisible) {
+        $('#noContentMessage').show();
+      } else {
+        $('#noContentMessage').hide();
+      }
+    }
+    
+    // Function to load tags data
+    function loadTagsData() {
+      // Show loading indicator
+      $("#loadingContentMessage").show();
+      $("#noTagsMessage").hide();
+      $("#noContentMessage").hide();
+      
+      countItemsByTag()
+        .then(tagMap => {
+          renderTagCloud(tagMap);
+          renderTagTree(tagMap);
+          
+          // Load content with selected tag (or all tagged content)
+          loadContentByTags();
+          
+          // Update statistics
+          $("#tagCount").text(`${tagMap.size} tags`);
+          const totalCount = Array.from(tagMap.values()).reduce((sum, count) => sum + count, 0);
+          $("#blocksTaggedCount").text(`${totalCount} items tagged`);
+          
+          // Hide loading message
+          $("#loadingContentMessage").hide();
+          
+          // Show no tags message if no tags found
+          if (tagMap.size === 0) {
+            $("#noTagsMessage").show();
+          }
+        })
+        .catch(err => {
+          console.error("Error loading tags data:", err);
+          $("#loadingContentMessage").hide();
+          $("#tagCloud").html(`
+            <div class="alert alert-danger">
+              <i class="fas fa-exclamation-triangle"></i> Error loading tags
+            </div>
+          `);
+        });
+    }
+    
+    // Function to render tag cloud
+    function renderTagCloud(tagMap) {
+      const tagCloudContainer = $("#tagCloud");
+      tagCloudContainer.empty();
+      
+      if (tagMap.size === 0) {
+        return;
+      }
+      
+      // Convert to array and sort by count (descending)
+      const tagsArray = Array.from(tagMap.entries())
+        .sort((a, b) => b[1] - a[1]);
+      
+      // Find min and max counts for sizing
+      const minCount = Math.min(...tagsArray.map(item => item[1]));
+      const maxCount = Math.max(...tagsArray.map(item => item[1]));
+      
+      // Create tag cloud items
+      tagsArray.forEach(([tag, count]) => {
+        // Calculate relative size (1-5)
+        let size = 1;
+        if (maxCount > minCount) {
+          size = Math.ceil(1 + 4 * (count - minCount) / (maxCount - minCount));
+        }
+        
+        const tagButton = $(`
+          <button class="btn btn-sm tag-cloud-item size-${size} mx-1 mb-2" 
+            data-tag="${tag}" data-count="${count}">
+            ${tag} <small class="tag-count">(${count})</small>
+          </button>
+        `);
+        
+        // Style based on size
+        switch(size) {
+          case 1:
+            tagButton.addClass('btn-outline-secondary');
+            break;
+          case 2:
+            tagButton.addClass('btn-outline-info');
+            break;
+          case 3:
+            tagButton.addClass('btn-outline-primary');
+            break;
+          case 4:
+            tagButton.addClass('btn-outline-success');
+            break;
+          case 5:
+            tagButton.addClass('btn-primary');
+            break;
+        }
+        
+        tagButton.on("click", function() {
+          selectTag($(this).data("tag"));
+        });
+        
+        tagCloudContainer.append(tagButton);
+      });
+    }
+    
+    // Function to render hierarchical tag tree
+    function renderTagTree(tagMap) {
+      const tagTreeContainer = $("#tagTree");
+      tagTreeContainer.empty();
+      
+      if (tagMap.size === 0) {
+        return;
+      }
+      
+      // Group tags into hierarchical structure
+      const tagHierarchy = buildTagHierarchy(tagMap);
+      
+      // Render the hierarchy
+      renderTagHierarchy(tagHierarchy, tagTreeContainer);
+      
+      // Initialize tree behavior
+      initializeTreeBehavior();
+    }
+    
+    // Function to build hierarchical structure of tags
+    function buildTagHierarchy(tagMap) {
+      const hierarchy = {};
+      
+      // Process each tag
+      tagMap.forEach((count, tag) => {
+        const parts = tag.split('/');
+        let currentLevel = hierarchy;
+        
+        // For each part of the tag path
+        for (let i = 0; i < parts.length; i++) {
+          const part = parts[i].trim();
+          if (!part) continue;
+          
+          // Create this level if it doesn't exist
+          if (!currentLevel[part]) {
+            currentLevel[part] = {
+              _count: i === parts.length - 1 ? count : 0,
+              _fullPath: parts.slice(0, i + 1).join('/'),
+              _children: {}
+            };
+          } else if (i === parts.length - 1) {
+            // If this is a leaf tag and it already exists, update the count
+            currentLevel[part]._count += count;
+          }
+          
+          // Move to next level
+          currentLevel = currentLevel[part]._children;
+        }
+      });
+      
+      return hierarchy;
+    }
+    
+    // Function to render tag hierarchy recursively
+    function renderTagHierarchy(hierarchyNode, container, level = 0) {
+      // Sort keys alphabetically
+      const keys = Object.keys(hierarchyNode)
+        .filter(key => !key.startsWith('_'))
+        .sort();
+      
+      keys.forEach(key => {
+        const node = hierarchyNode[key];
+        const fullPath = node._fullPath;
+        const count = node._count || 0;
+        const hasChildren = Object.keys(node._children).length > 0;
+        
+        // Calculate the font size based on count
+        let sizeClass = 'size-1';
+        if (count > 0) {
+          if (count >= 20) sizeClass = 'size-5';
+          else if (count >= 10) sizeClass = 'size-4';
+          else if (count >= 5) sizeClass = 'size-3';
+          else if (count >= 2) sizeClass = 'size-2';
+        }
+        
+        if (hasChildren) {
+          // Create category with toggle
+          const categoryLi = $(`
+            <li class="tag-category" data-depth="${level}" data-tag="${fullPath}">
+              <div class="tag-category-header">
+                <span class="tag-toggle"><i class="fas fa-caret-right"></i></span>
+                <span class="tag-name ${count > 0 ? sizeClass + ' clickable-tag' : ''}" 
+                      data-tag="${fullPath}">
+                  ${key} ${count > 0 ? `<small>(${count})</small>` : ''}
+                </span>
+              </div>
+              <ul class="nested tag-children list-unstyled" style="display: none;"></ul>
+            </li>
+          `);
+          
+          // If this category also has its own count, make it clickable
+          if (count > 0) {
+            categoryLi.find('.tag-name').click(function(e) {
+              e.stopPropagation();
+              selectTag($(this).data('tag'));
+            });
+          }
+          
+          container.append(categoryLi);
+          
+          // Render children
+          renderTagHierarchy(node._children, categoryLi.find('.tag-children'), level + 1);
+        } else {
+          // Create leaf tag
+          const tagLi = $(`
+            <li class="tag-tree-item" data-tag="${fullPath}">
+              <span class="tag-name clickable-tag ${sizeClass}" data-tag="${fullPath}">
+                ${key} <small>(${count})</small>
+              </span>
+            </li>
+          `);
+          
+          tagLi.find('.tag-name').click(function() {
+            selectTag($(this).data('tag'));
+          });
+          
+          container.append(tagLi);
+        }
+      });
+    }
+    
+    // Initialize tree behavior
+    function initializeTreeBehavior() {
+      $('.tag-category-header').click(function(e) {
+        if (!$(e.target).hasClass('clickable-tag')) {
+          const $toggle = $(this).find('.tag-toggle i');
+          $toggle.toggleClass('fa-caret-right fa-caret-down');
+          $(this).siblings('.tag-children').slideToggle(150);
+        }
+      });
+      
+      // Expand first level categories by default for better visibility
+      $('.tag-category[data-depth="0"] > .tag-category-header').each(function() {
+        $(this).find('.tag-toggle i').toggleClass('fa-caret-right fa-caret-down');
+        $(this).siblings('.tag-children').slideDown(0); // instant without animation
+      });
+    }
+    
+    // Function to select a tag and load related content
+    function selectTag(tag) {
+      window.appState.selectedTag = tag;
+      
+      // Update UI
+      $("#selectedTagTitle").text(`Content Tagged with:`);
+      $("#selectedTagBadge").text(tag).show();
+      $("#clearTagFilter").show();
+      
+      // Highlight selected tags
+      $(".tag-cloud-item, .clickable-tag").removeClass("active");
+      $(`.tag-cloud-item[data-tag="${tag}"], .clickable-tag[data-tag="${tag}"]`).addClass("active");
+      
+      // Expand all parent categories of the selected tag
+      expandTagParents(tag);
+      
+      // Load content with selected tag
+      loadContentByTags(tag);
+    }
+    
+    // Function to expand parent categories of a selected tag
+    function expandTagParents(tag) {
+      if (tag.includes('/')) {
+        const parts = tag.split('/');
+        let path = '';
+        
+        // For each level of the hierarchy
+        for (let i = 0; i < parts.length - 1; i++) {
+          path += (i > 0 ? '/' : '') + parts[i];
+          const categoryHeader = $(`.tag-category[data-tag="${path}"] > .tag-category-header`);
+          const toggle = categoryHeader.find('.tag-toggle i');
+          
+          // Open this category if it's closed
+          if (toggle.hasClass('fa-caret-right')) {
+            toggle.removeClass('fa-caret-right').addClass('fa-caret-down');
+            categoryHeader.siblings('.tag-children').slideDown(150);
+          }
+        }
+      }
+    }
+    
+    // Function to load content by tags
+    function loadContentByTags(tag = null) {
+      $("#blocksByTagList").empty();
+      $("#documentsByTagList").empty();
+      $("#blocksSectionTitle").hide();
+      $("#documentsSectionTitle").hide();
+      
+      const selectedTag = tag || window.appState.selectedTag;
+      
+      // Show loading indicator
+      $("#loadingContentMessage").show();
+      
+      Promise.all([
+        selectedTag ? getBlocksByTag(selectedTag) : getAllTaggedBlocks(),
+        selectedTag ? getDocumentsByTag(selectedTag) : getAllTaggedDocuments()
+      ])
+      .then(([blocks, documents]) => {
+        // Hide loading message
+        $("#loadingContentMessage").hide();
+        
+        // Sort blocks and documents
+        blocks.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+        documents.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+        
+        // Show section headers based on results
+        if (blocks.length > 0) {
+          $("#blocksSectionTitle").text(`Blocks (${blocks.length})`).show();
+          renderBlocks(blocks, selectedTag);
+        }
+        
+        if (documents.length > 0) {
+          $("#documentsSectionTitle").text(`Documents (${documents.length})`).show();
+          renderDocuments(documents, selectedTag);
+        }
+        
+        checkNoContentMessage();
+        
+        // Apply current content filter
+        const currentFilter = $('.btn-group[aria-label="Content type filter"] button.active').data('content-type');
+        filterContentByType(currentFilter);
+      })
+      .catch(err => {
+        console.error("Error loading content by tags:", err);
+        $("#loadingContentMessage").hide();
+        $("#taggedContentContainer").append(`
+          <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle"></i> Error loading content
+          </div>
+        `);
+      });
+    }
+    
+    // Get all blocks with any tags
+    function getAllTaggedBlocks() {
+      return new Promise((resolve, reject) => {
+        ensureDatabaseReady()
+          .then(db => {
+            const transaction = db.transaction(["blocks"], "readonly");
+            const store = transaction.objectStore("blocks");
+            const request = store.getAll();
+            
+            request.onsuccess = function(event) {
+              const blocks = event.target.result || [];
+              resolve(blocks.filter(block => block.tags && Array.isArray(block.tags) && block.tags.length > 0));
+            };
+            
+            request.onerror = function(event) {
+              reject(event.target.error);
+            };
+          })
+          .catch(err => reject(err));
+      });
+    }
+    
+    // Get all documents with tagged paragraphs
+    function getAllTaggedDocuments() {
+      return new Promise((resolve, reject) => {
+        ensureDatabaseReady()
+          .then(db => {
+            const transaction = db.transaction(["documents"], "readonly");
+            const store = transaction.objectStore("documents");
+            const request = store.getAll();
+            
+            request.onsuccess = function(event) {
+              const docs = event.target.result || [];
+              const docsWithTaggedParagraphs = [];
+              
+              docs.forEach(doc => {
+                if (doc.paragraphs && Array.isArray(doc.paragraphs)) {
+                  // Find paragraphs with any tag
+                  const taggedParagraphs = doc.paragraphs.filter(para => 
+                    para.tags && Array.isArray(para.tags) && para.tags.length > 0
+                  );
+                  
+                  if (taggedParagraphs.length > 0) {
+                    docsWithTaggedParagraphs.push({
+                      ...doc,
+                      taggedParagraphs: taggedParagraphs
+                    });
+                  }
+                }
+              });
+              
+              resolve(docsWithTaggedParagraphs);
+            };
+            
+            request.onerror = function(event) {
+              reject(event.target.error);
+            };
+          })
+          .catch(err => reject(err));
+      });
+    }
+    
+    // Function to render blocks
+    function renderBlocks(blocks, selectedTag) {
+      const blocksContainer = $("#blocksByTagList");
+      blocksContainer.empty();
+      
+      blocks.forEach(block => {
+        const blockItem = $(`
+          <div class="card mb-3 block-item">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h6 class="mb-0">${block.title || `Block ${block.id}`}</h6>
+              <div>
+                <button class="btn btn-sm btn-outline-primary view-block-btn" data-id="${block.id}">
+                  <i class="fas fa-eye"></i> View
+                </button>
+                <button class="btn btn-sm btn-outline-warning edit-block-btn" data-id="${block.id}">
+                  <i class="fas fa-edit"></i> Edit
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="block-content-preview small">
+                ${marked.parse(block.content ? block.content.slice(0, 150) + (block.content.length > 150 ? "..." : "") : "")}
+              </div>
+              <div class="block-tags mt-2">
+                ${renderTagBadges(block.tags, selectedTag)}
+              </div>
+            </div>
+          </div>
+        `);
+        
+        blocksContainer.append(blockItem);
+      });
+      
+      // Add block action handlers
+      addBlockActionHandlers();
+    }
+    
+    // Function to render documents with tagged paragraphs
+    function renderDocuments(documents, selectedTag) {
+      const documentsContainer = $("#documentsByTagList");
+      documentsContainer.empty();
+      
+      documents.forEach(doc => {
+        // Create document card with collapsible tagged paragraphs
+        const docCard = $(`
+          <div class="card mb-3 document-item">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h6 class="mb-0">${doc.title || `Document ${doc.id}`}</h6>
+              <div>
+                <button class="btn btn-sm btn-outline-primary view-doc-btn" data-id="${doc.id}">
+                  <i class="fas fa-eye"></i> View
+                </button>
+                <button class="btn btn-sm btn-outline-warning edit-doc-btn" data-id="${doc.id}">
+                  <i class="fas fa-edit"></i> Edit
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <p class="small text-muted">
+                Created: ${doc.created ? new Date(doc.created).toLocaleDateString() : "Unknown"}
+                ${doc.updated ? ` • Updated: ${new Date(doc.updated).toLocaleDateString()}` : ""}
+              </p>
+              <p><strong>Tagged paragraphs:</strong> ${doc.taggedParagraphs.length}</p>
+              <div class="accordion tagged-paragraphs" id="docParagraphs${doc.id}">
+                <!-- Paragraphs will be added here -->
+              </div>
+            </div>
+          </div>
+        `);
+        
+        // Add tagged paragraphs to the accordion
+        doc.taggedParagraphs.forEach((paragraph, index) => {
+          const paraId = `doc${doc.id}para${index}`;
+          
+          const paragraphItem = $(`
+            <div class="card">
+              <div class="card-header" id="heading${paraId}">
+                <h2 class="mb-0">
+                  <button class="btn btn-link btn-block text-left collapsed" type="button" 
+                          data-toggle="collapse" data-target="#collapse${paraId}" 
+                          aria-expanded="false" aria-controls="collapse${paraId}">
+                    ${paragraph.title || `Paragraph ${index + 1}`}
+                  </button>
+                </h2>
+              </div>
+              <div id="collapse${paraId}" class="collapse" aria-labelledby="heading${paraId}" data-parent="#docParagraphs${doc.id}">
+                <div class="card-body">
+                  <div class="paragraph-content small">
+                    ${marked.parse(paragraph.content || '')}
+                  </div>
+                  <div class="paragraph-tags mt-2">
+                    ${renderTagBadges(paragraph.tags, selectedTag)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          `);
+          
+          docCard.find('.tagged-paragraphs').append(paragraphItem);
+        });
+        
+        documentsContainer.append(docCard);
+      });
+      
+      // Add document action handlers
+      addDocumentActionHandlers();
+    }
+    
+    // Helper function to render tag badges with highlighting for selected tag
+    function renderTagBadges(tags, selectedTag) {
+      if (!tags || !Array.isArray(tags) || tags.length === 0) return '';
+      
+      return tags.map(tag => {
+        const isSelected = selectedTag && (
+          tag.toLowerCase() === selectedTag.toLowerCase() ||
+          tag.toLowerCase().startsWith(selectedTag.toLowerCase() + '/') ||
+          selectedTag.toLowerCase().startsWith(tag.toLowerCase() + '/')
+        );
+        
+        return `<span class="badge badge-${isSelected ? 'primary' : 'secondary'} mr-1 tag-badge" 
+                     data-tag="${tag}">${tag}</span>`;
+      }).join('');
+    }
+    
+    // Add click handlers for block action buttons
+    function addBlockActionHandlers() {
+      $(".view-block-btn").on("click", function() {
+        const blockId = parseInt($(this).data("id"), 10);
+        // Switch to blocks tab and view the block
+        $("#blocks-tab").tab("show");
+        setTimeout(() => {
+          if (window.viewBlock) {
+            window.viewBlock(blockId);
+          }
+        }, 300);
+      });
+      
+      $(".edit-block-btn").on("click", function() {
+        const blockId = parseInt($(this).data("id"), 10);
+        // Use the universal edit block function if available
+        if (window.editBlockUniversal) {
+          window.editBlockUniversal(blockId);
+        } else {
+          // Switch to blocks tab
+          $("#blocks-tab").tab("show");
+        }
+      });
+      
+      // Make tag badges clickable
+      $(".block-tags .tag-badge").on("click", function(e) {
+        e.stopPropagation();
+        const tag = $(this).data("tag");
+        selectTag(tag);
+      });
+    }
+    
+    // Add click handlers for document action buttons
+    function addDocumentActionHandlers() {
+      $(".view-doc-btn").on("click", function() {
+        const docId = parseInt($(this).data("id"), 10);
+        // Switch to documents tab and preview
+        $("#documents-tab").tab("show");
+        setTimeout(() => {
+          if (window.previewDocument) {
+            window.previewDocument(docId);
+          }
+        }, 300);
+      });
+      
+      $(".edit-doc-btn").on("click", function() {
+        const docId = parseInt($(this).data("id"), 10);
+        // Switch to documents tab and edit
+        $("#documents-tab").tab("show");
+        setTimeout(() => {
+          $(`.edit-document-btn[data-id="${docId}"]`).click();
+        }, 300);
+      });
+      
+      // Make tag badges clickable
+      $(".paragraph-tags .tag-badge").on("click", function(e) {
+        e.stopPropagation();
+        const tag = $(this).data("tag");
+        selectTag(tag);
+      });
+    }
+  });
+</script>
+
+<style>
+/* Tag tree styling */
+.tag-tree {
+  padding-left: 0;
+}
+
+.tag-category-header {
+  cursor: pointer;
+  padding: 3px 0;
+  display: flex;
+  align-items: center;
+}
+
+.tag-name {
+  display: inline-block;
+}
+
+.clickable-tag {
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 3px;
+}
+
+.clickable-tag:hover {
+  background-color: #f0f0f0;
+}
+
+.clickable-tag.active {
+  background-color: #007bff;
+  color: white;
+}
+
+.tag-toggle {
+  cursor: pointer;
+  width: 14px;
+  display: inline-block;
+  text-align: center;
+}
+
+.tag-tree-item {
+  padding: 3px 0;
+}
+
+/* Size classes for tags */
+.tag-name.size-1 { font-size: 0.85em; }
+.tag-name.size-2 { font-size: 0.95em; }
+.tag-name.size-3 { font-size: 1em; }
+.tag-name.size-4 { font-size: 1.1em; }
+.tag-name.size-5 { font-size: 1.2em; font-weight: bold; }
+
+/* Tag cloud styling */
+.tag-cloud-item {
+  margin-bottom: 5px;
+  border-radius: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag-cloud-item.size-1 { font-size: 0.8em; }
+.tag-cloud-item.size-2 { font-size: 0.9em; }
+.tag-cloud-item.size-3 { font-size: 1em; }
+.tag-cloud-item.size-4 { font-size: 1.1em; }
+.tag-cloud-item.size-5 { font-size: 1.2em; font-weight: bold; }
+
+/* Section styling */
+.section-title {
+  border-bottom: 1px solid #eee;
+  padding-bottom: 8px;
+  margin-bottom: 15px;
+}
+
+/* Make tag badges clickable */
+.tag-badge {
+  cursor: pointer;
+}
+
+.tag-badge:hover {
+  opacity: 0.8;
+}
+</style>
