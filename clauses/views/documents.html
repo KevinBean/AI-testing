@@ -89,7 +89,9 @@
       fetchBlockById(parseInt(blockId), function(block) {
         if(block) {
           const previewHtml = `<div class="alert alert-info">
+            <strong>Reminder:</strong> This preview will close automatically in 2 minutes.<br>
             <strong>Block ${blockId}: ${block.title || ''}</strong> ${marked.parse(block.text || block.content || '')}
+            ${block.notes ? `<div><strong>Notes:</strong> ${block.notes}</div>` : ''}
             ${block.standard ? `<div><strong>Standard:</strong> ${block.standard} 
             ${block.stdLevels && block.stdLevels.length > 0 ? block.stdLevels.join(".") : ""}</div>` : '' }
             ${block.tags && block.tags.length ? `<div><strong>Tags:</strong> ${block.tags.join(", ")}</div>` : '' }
@@ -100,7 +102,7 @@
             containerElement.find(".alert").fadeOut('slow', function() {
               $(this).remove();
             });
-          }, 3000);
+          }, 120000);
         } else {
           alert("Block not found!");
         }

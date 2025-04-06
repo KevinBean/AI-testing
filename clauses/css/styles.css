@@ -13,7 +13,34 @@ body {
 }
 
 .ui-autocomplete { 
-  z-index: 1050; 
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 9999 !important;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  padding: 5px 0;
+  background: white;
+}
+
+.ui-menu-item-with-icon {
+  padding: 8px 12px;
+  display: block;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.ui-menu-item-with-icon:hover {
+  background: #f0f0f0;
+  cursor: pointer;
+}
+
+.ui-state-focus, .ui-state-active {
+  border: none !important;
+  background: #f5f5f5 !important;
+  font-weight: normal !important;
+  color: #333 !important;
+  margin: 0 !important;
 }
 
 .sortable-placeholder { 
@@ -34,6 +61,15 @@ body {
 
 .list-item { 
   cursor: pointer; 
+  transition: background-color 0.2s ease;
+}
+
+.list-item:hover {
+  background-color: #f8f9fa;
+}
+
+.list-item.active {
+  background-color: #e9ecef;
 }
 
 .action-btn { 
@@ -774,10 +810,17 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   z-index: 9999 !important;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  padding: 5px 0;
+  background: white;
 }
 
 .ui-menu-item-with-icon {
-  padding: 3px 8px;
+  padding: 8px 12px;
+  display: block;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .ui-menu-item-with-icon:hover {

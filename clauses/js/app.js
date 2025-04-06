@@ -654,3 +654,63 @@ function checkDatabaseConnectivity() {
     return false;
   }
 }
+
+// Additional utility functions for block notes
+function getAllBlocksWithNotes() {
+  return new Promise((resolve, reject) => {
+    ensureDatabaseReady()
+      .then(db => {
+        const transaction = db.transaction(["blocks"], "readonly");
+        const store = transaction.objectStore("blocks");
+        const blocksWithNotes = [];
+        
+        store.openCursor().onsuccess = function(e) {
+          const cursor = e.target.result;
+          if (cursor) {
+            const block = cursor.value;
+            if (block.notes && block.notes.trim()) {
+              blocksWithNotes.push(block);
+            }
+            cursor.continue();
+          } else {
+            resolve(blocksWithNotes);
+          }
+        };
+        
+        transaction.onerror = function(e) {
+          reject(e.target.error);
+        };
+      })
+      .catch(err => reject(err));
+  });
+}
+
+// Helper function to get all blocks without notes
+function getBlocksWithoutNotes() {
+  return new Promise((resolve, reject) => {
+    ensureDatabaseReady()
+      .then(db => {
+        const transaction = db.transaction(["blocks"], "readonly");
+        const store = transaction.objectStore("blocks");
+        const blocksWithoutNotes = [];
+        
+        store.openCursor().onsuccess = function(e) {
+          const cursor = e.target.result;
+          if (cursor) {
+            const block = cursor.value;
+            if (!block.notes || !block.notes.trim()) {
+              blocksWithoutNotes.push(block);
+            }
+            cursor.continue();
+          } else {
+            resolve(blocksWithoutNotes);
+          }
+        };
+        
+        transaction.onerror = function(e) {
+          reject(e.target.error);
+        };
+      })
+      .catch(err => reject(err));
+  });
+}

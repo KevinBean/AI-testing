@@ -380,6 +380,7 @@ function loadBlockReferences(doc) {
             </div>
             <div class="card-body">
               ${marked.parse(block.content || block.text || '')}
+              ${block.notes ? `<div class="block-notes mt-2"><strong>Notes:</strong> ${block.notes}</div>` : ''}
               ${block.tags && block.tags.length ? 
                 `<div class="block-tags mt-2">${block.tags.map(tag => `<span class="badge badge-secondary mr-1">${tag}</span>`).join('')}</div>` : ''}
             </div>

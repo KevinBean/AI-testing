@@ -144,7 +144,14 @@ function exportData() {
     const request = store.getAll();
     
     request.onsuccess = function() {
-      exportData.blocks = request.result;
+      // Process blocks to ensure notes field exists
+      exportData.blocks = request.result.map(block => {
+        // Ensure block has notes field to avoid import issues later
+        if (block && !block.hasOwnProperty('notes')) {
+          block.notes = '';
+        }
+        return block;
+      });
       resolve();
     };
     
@@ -355,6 +362,11 @@ function performImport(importOption) {
         let completed = 0;
         
         items.forEach(item => {
+          // Special handling for blocks to ensure notes field exists
+          if (storeName === "blocks" && !item.hasOwnProperty('notes')) {
+            item.notes = '';
+          }
+          
           const request = store.put(item);
           
           request.onsuccess = function() {

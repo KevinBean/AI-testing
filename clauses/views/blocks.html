@@ -28,7 +28,26 @@
           <span aria-hidden="true">&times;</span>
         </button>
       </div>
-      <div class="card-body block-detail-content"></div>
+      <div class="card-body block-detail-content">
+        
+      </div>
+      <!-- Adding notes section to block details view -->
+      <div class="card-footer bg-light">
+        <div class="d-flex align-items-center">
+          <strong class="mr-2">Notes:</strong>
+          <div class="flex-grow-1 block-notes-display text-muted font-italic"></div>
+          <button class="btn btn-sm btn-outline-secondary ml-2 edit-block-notes-btn">
+            <i class="fas fa-edit"></i>
+          </button>
+        </div>
+        <div class="mt-2 block-notes-edit-container" style="display: none;">
+          <textarea class="form-control block-notes-edit mb-2" rows="2"></textarea>
+          <div class="d-flex justify-content-end">
+            <button class="btn btn-sm btn-secondary mr-2 cancel-block-notes-btn">Cancel</button>
+            <button class="btn btn-sm btn-primary save-block-notes-btn">Save Notes</button>
+          </div>
+        </div>
+      </div>
     </div>
     
     <!-- Reference References Section -->
@@ -41,7 +60,7 @@
       </div>
     </div>
   </div>
-  <div class="col-md-4">
+  <div class="col-md-4 editor-col">
     <!-- Block Form Section - Moved from modal to main stage -->
     <div id="blockFormSection" class="card mb-3">
       <div class="card-header bg-light">
@@ -58,6 +77,12 @@
             <label for="blockText">Block Text (Markdown)</label>
             <a href="#" data-toggle="tooltip" title="Use Markdown formatting: **bold**, *italic*, etc."><i class="fas fa-question-circle"></i></a>
             <textarea id="blockText" class="form-control docParagraph" rows="6" placeholder="Enter block text in Markdown" required></textarea>
+          </div>
+          <!-- Add notes field to the block form -->
+          <div class="form-group">
+            <label for="blockNotes">Notes (optional)</label>
+            <a href="#" data-toggle="tooltip" title="Add private notes about this block"><i class="fas fa-question-circle"></i></a>
+            <textarea id="blockNotes" class="form-control" rows="2" placeholder="Add your personal notes here"></textarea>
           </div>
           <div class="row">
             <div class="col-md-8">
@@ -104,9 +129,34 @@
     // Initialize tooltips
     $('[data-toggle="tooltip"]').tooltip();
     
+    // Ensure viewBlock function is available globally
+    window.viewBlock = viewBlock;
+    window.fetchBlockById = fetchBlockById;
+    window.editBlockUniversal = editBlockUniversal;
+    
     // Ensure block fetching works from other views
     window.fetchBlockById = fetchBlockById;
     window.editBlockUniversal = editBlockUniversal;
+    
+    // Initialize standard autocomplete specifically for both block forms
+    initializeStandardAutocomplete("#blockStandard");
+    initializeStandardAutocomplete("#blockModalForm #blockStandard");
+    
+    // Initialize tag autocomplete
+    initializeTagAutocomplete("#blockTags");
+    initializeTagAutocomplete("#blockModalForm #blockTags");
+    
+    // Update autocomplete lists at startup
+    updateStandardAutocomplete();
+    updateTagsList();
+    
+    // Add handler to close block details
+    $(".close-block-details").on("click", function() {
+      $("#blockDetailView").hide();
+    });
+    
+    // Load blocks on page load
+    loadBlocks();
     
     // Fix for the save button not working
     $("#saveBlockButton").off("click").on("click", function() {
@@ -114,6 +164,7 @@
       const block = {
         title: $("#blockTitle").val().trim(),
         content: $("#blockText").val().trim(),
+        notes: $("#blockNotes").val().trim(),
         tags: $("#blockTags").val().trim().split(',').map(tag => tag.trim()).filter(tag => tag),
         standard: $("#blockStandard").val().trim() || null,
         levels: Array.from({ length: 6 }, (_, i) => {
@@ -241,6 +292,7 @@
               if (block) {
                 $("#blockTitle").val(block.title || "");
                 $("#blockText").val(block.content || "");
+                $("#blockNotes").val(block.notes || "");
                 $("#blockTags").val(block.tags ? block.tags.join(", ") : "");
                 $("#blockStandard").val(block.standard || "");
                 
@@ -266,17 +318,101 @@
       $("#blockDetailView").hide();
     };
     
-    // Override viewBlock to also display references
+    // Add handlers for block notes
+    $(document).on("click", ".edit-block-notes-btn", function() {
+      const notesText = $(".block-notes-display").text().trim();
+      $(".block-notes-edit").val(notesText);
+      $(".block-notes-display").parent().hide();
+      $(".block-notes-edit-container").show();
+    });
+    
+    $(document).on("click", ".cancel-block-notes-btn", function() {
+      $(".block-notes-edit-container").hide();
+      $(".block-notes-display").parent().show();
+    });
+    
+    $(document).on("click", ".save-block-notes-btn", function() {
+      const notes = $(".block-notes-edit").val().trim();
+      
+      if (!selectedBlockId) return;
+      
+      ensureDatabaseReady()
+        .then(db => {
+          const transaction = db.transaction(["blocks"], "readwrite");
+          const store = transaction.objectStore("blocks");
+          const request = store.get(selectedBlockId);
+          
+          request.onsuccess = function(event) {
+            const block = event.target.result;
+            if (block) {
+              block.notes = notes;
+              block.lastModified = new Date().toISOString();
+              
+              const updateRequest = store.put(block);
+              
+              updateRequest.onsuccess = function() {
+                showNotification("Notes updated", "success");
+                $(".block-notes-display").text(notes || "No notes added");
+                $(".block-notes-edit-container").hide();
+                $(".block-notes-display").parent().show();
+                
+                // Refresh blocks list to show updated info
+                loadBlocks();
+              };
+              
+              updateRequest.onerror = function(e) {
+                console.error("Error updating block notes:", e.target.error);
+                showNotification("Error saving notes", "danger");
+              };
+            }
+          };
+        })
+        .catch(err => {
+          console.error("Database error when saving notes:", err);
+          showNotification("Database error", "danger");
+        });
+    });
+    
+    // Override viewBlock to include notes
     const originalViewBlock = window.viewBlock;
     window.viewBlock = function(blockId) {
-      // Call the original function first
-      if (originalViewBlock) {
+      // Call the original function or handle if it doesn't exist
+      if (typeof originalViewBlock === 'function') {
         originalViewBlock(blockId);
+      } else {
+        console.warn("Original viewBlock function not found, implementing directly");
+        displayBlockDetails(blockId);
       }
+      
+      // Show notes for this block
+      displayBlockNotes(blockId);
       
       // Then load references for this block
       findDocumentReferences(blockId);
     };
+    
+    // Function to display block notes
+    function displayBlockNotes(blockId) {
+      ensureDatabaseReady()
+        .then(db => {
+          const transaction = db.transaction(["blocks"], "readonly");
+          const store = transaction.objectStore("blocks");
+          const request = store.get(parseInt(blockId));
+          
+          request.onsuccess = function(event) {
+            const block = event.target.result;
+            if (block) {
+              const notesText = block.notes || "No notes added";
+              $(".block-notes-display").text(notesText);
+            }
+          };
+          
+          request.onerror = function(e) {
+            console.error("Error fetching block notes:", e.target.error);
+            $(".block-notes-display").text("Error loading notes");
+          };
+        });
+    }
     
     // Handle the cancel button
     $("#cancelBlockEdit").click(function() {

@@ -491,6 +491,10 @@ function combineStandard(stdId) {
             html += ": <strong>" + (block.title || "Block " + block.id) + "</strong> - " + 
                     (blockContent ? marked.parse(blockContent) : "<em>No content</em>");
             
+            // add notes if available
+            if (block.notes) {
+              html += "<br><small><strong>Notes:</strong></small><pre><code>" + block.notes + "</code></pre><br>";
+            }
             html += `<button class="btn btn-sm btn-warning edit-std-block-btn ml-2" data-block-id="${block.id}">Edit</button>`;
             html += "</li>";
           });

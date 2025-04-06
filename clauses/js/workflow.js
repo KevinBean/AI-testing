@@ -88,14 +88,6 @@ const editWorkflow = function(workflow) {
                   <small class="form-text text-muted">Use {previous} to insert the output from the previous step</small>
                 </div>
 
-                <div class="mt-2">
-                  <button class="btn btn-sm btn-secondary selectStepContentBtn" type="button" data-step-index="${index}">
-                    Select Content
-                  </button>
-                  <span class="selected-content-indicator" style="display:${workflowStepSelectedContent[index] ? 'inline' : 'none'};">
-                    <i class="fas fa-check-circle text-success"></i> <span class="selected-count">${workflowStepSelectedContent[index] ? workflowStepSelectedContent[index].length : 0}</span> items selected
-                  </span>
-                </div>
               </div>
             </div>
           `;
@@ -251,7 +243,7 @@ $(document).ready(function() {
     loadWorkflows();
   });
 
-  $("#confirmContentSelection").off("click.workflow").on("click.workflow", function() {
+  $("#confirmContentSelectionforSteps").off("click.workflow").on("click.workflow", function() {
     if (currentEditingStepIndex !== null) {
       console.log(`Content selected for step ${currentEditingStepIndex}, items:`, selectedContentItems);
       
@@ -270,11 +262,11 @@ $(document).ready(function() {
       
       $step.find(".step-input-selected").prop("checked", true);
       
-      $("#contentSelectionModal").modal("hide");
+      $("#contentSelectionModalforSteps").modal("hide");
     }
   });
   
-  $("#contentSelectionModal").on("hidden.bs.modal", function() {
+  $("#contentSelectionModalforSteps").on("hidden.bs.modal", function() {
     currentEditingStepIndex = null;
   });
 
@@ -301,15 +293,15 @@ $(document).ready(function() {
   });
 
   // Modal initialization check
-  $('#contentSelectionModal').on('shown.bs.modal', function() {
+  $('#contentSelectionModalforSteps').on('shown.bs.modal', function() {
     console.log("Modal shown event triggered - modal is now visible");
   });
   
-  $('#contentSelectionModal').on('show.bs.modal', function() {
+  $('#contentSelectionModalforSteps').on('show.bs.modal', function() {
     console.log("Modal show event triggered - modal is about to be shown");
   });
   
-  $('#contentSelectionModal').on('hidden.bs.modal', function() {
+  $('#contentSelectionModalforSteps').on('hidden.bs.modal', function() {
     console.log("Modal hidden event triggered - modal is now hidden");
     currentEditingStepIndex = null;
   });
@@ -601,13 +593,13 @@ function openContentSelectionForStep(stepIndex) {
   }
   
   // Debugging code to check modal visibility issues
-  console.log("Content selection modal element exists:", $("#contentSelectionModal").length > 0);
+  console.log("Content selection modal element exists:", $("#contentSelectionModalforSteps").length > 0);
   
   // Create updateSelectedItemsUI function if it doesn't exist
   if (typeof updateSelectedItemsUI !== 'function') {
     window.updateSelectedItemsUI = function() {
-      const selectedItemsList = $("#selectedItemsList");
-      const selectedItemsCount = $("#selectedItemsCount");
+      const selectedItemsList = $("#selectedItemsListforSteps");
+      const selectedItemsCount = $("#selectedItemsCountforSteps");
       
       selectedItemsCount.text(selectedContentItems.length);
       
@@ -653,7 +645,7 @@ function openContentSelectionForStep(stepIndex) {
   
   // Setup modal content before showing
   $(".action-selection-info").text("Select content for this workflow step");
-  $("#contentSelectionModal").data("selection-mode", "multiple");
+  $("#contentSelectionModalforSteps").data("selection-mode", "multiple");
   
   // Initialize the tab contents before showing modal (important for proper display)
   $("#blocksTab").addClass("show active");
@@ -665,7 +657,7 @@ function openContentSelectionForStep(stepIndex) {
     $(".modal-backdrop").remove();
     
     // Show modal with proper settings
-    $("#contentSelectionModal").modal({
+    $("#contentSelectionModalforSteps").modal({
       backdrop: 'static',
       keyboard: true,
       show: true

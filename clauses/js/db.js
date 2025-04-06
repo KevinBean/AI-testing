@@ -31,7 +31,9 @@ function initializeDatabase() {
     
     // Create object stores if they don't exist
     if (!db.objectStoreNames.contains('blocks')) {
-      db.createObjectStore('blocks', { keyPath: 'id', autoIncrement: true });
+      const blockStore = db.createObjectStore('blocks', { keyPath: 'id', autoIncrement: true });
+      // Add an index for notes to make them searchable
+      blockStore.createIndex('notes', 'notes', { unique: false });
     }
     
     if (!db.objectStoreNames.contains('standards')) {
@@ -157,6 +159,11 @@ function ensureSafeDbObject(obj, defaultProperties = {}) {
     safeObj.tags = [];
   }
   
+  // Ensure notes is always a string
+  if (typeof safeObj.notes !== 'string') {
+    safeObj.notes = '';
+  }
+  
   return safeObj;
 }
 
@@ -165,6 +172,7 @@ function ensureSafeDbObject(obj, defaultProperties = {}) {
 //   title: "Untitled",
 //   text: "",
 //   tags: [],
+//   notes: "",
 //   standard: "",
 //   stdLevels: []
 // });

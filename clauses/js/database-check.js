@@ -53,6 +53,138 @@ function checkDatabaseStatus() {
   return status;
 }
 
+// Check if database schema meets current requirements
+function checkDatabaseSchema() {
+  return new Promise((resolve, reject) => {
+    // Define expected object stores and indexes
+    const expectedStores = [
+      { name: "blocks", indexes: ["standard", "notes"] },  // Added notes index
+      { name: "standards", indexes: [] },
+      { name: "documents", indexes: [] },
+      { name: "collections", indexes: [] },
+      { name: "documentCollections", indexes: ["documentId", "collectionId"] },
+      { name: "actions", indexes: [] },
+      { name: "workflows", indexes: [] }
+    ];
+    
+    const CURRENT_DB_VERSION = 1;
+    
+    try {
+      // Get database reference
+      const db = (window.appState && window.appState.db) || window.db;
+      
+      if (!db) {
+        reject(new Error("No database instance available"));
+        return;
+      }
+      
+      // Check if all expected stores exist
+      const existingStores = Array.from(db.objectStoreNames);
+      const missingStores = expectedStores
+        .filter(store => !existingStores.includes(store.name))
+        .map(store => store.name);
+      
+      // Check schema is complete
+      const schemaComplete = missingStores.length === 0;
+      
+      resolve({
+        complete: schemaComplete,
+        currentVersion: db.version,
+        expectedVersion: CURRENT_DB_VERSION,
+        missingStores: missingStores
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+// Force schema upgrade to add missing stores
+function forceSchemaUpgrade() {
+  return new Promise((resolve, reject) => {
+    try {
+      const db = (window.appState && window.appState.db) || window.db;
+      
+      if (!db) {
+        reject(new Error("No database instance available"));
+        return;
+      }
+      
+      // Close existing connection
+      db.close();
+      
+      // Open with version upgrade
+      const openRequest = indexedDB.open("EnhancedNoteDB", CURRENT_DB_VERSION + 1);
+      
+      openRequest.onupgradeneeded = function(event) {
+        const db = event.target.result;
+        console.log("Forcing schema upgrade to version:", db.version);
+        
+        // Ensure blocks store exists and has notes index
+        if (!db.objectStoreNames.contains('blocks')) {
+          const blockStore = db.createObjectStore('blocks', { keyPath: 'id', autoIncrement: true });
+          blockStore.createIndex('standard', 'standard', { unique: false });
+          blockStore.createIndex('notes', 'notes', { unique: false });
+        } else {
+          // Store exists, check for notes index
+          const tx = event.target.transaction;
+          const blockStore = tx.objectStore('blocks');
+          
+          // Create notes index if it doesn't exist
+          if (!blockStore.indexNames.contains('notes')) {
+            blockStore.createIndex('notes', 'notes', { unique: false });
+          }
+        }
+        
+        // Ensure other stores exist
+        const existingStores = Array.from(db.objectStoreNames);
+        
+        if (!existingStores.includes('standards')) {
+          db.createObjectStore('standards', { keyPath: 'id' });
+        }
+        
+        if (!existingStores.includes('documents')) {
+          db.createObjectStore('documents', { keyPath: 'id', autoIncrement: true });
+        }
+        
+        if (!existingStores.includes('actions')) {
+          db.createObjectStore('actions', { keyPath: 'id', autoIncrement: true });
+        }
+        
+        if (!existingStores.includes('workflows')) {
+          db.createObjectStore('workflows', { keyPath: 'id', autoIncrement: true });
+        }
+        
+        if (!existingStores.includes('collections')) {
+          const collectionsStore = db.createObjectStore('collections', { keyPath: 'id', autoIncrement: true });
+          collectionsStore.createIndex('name', 'name', { unique: false });
+          collectionsStore.createIndex('created', 'created', { unique: false });
+        }
+        
+        if (!existingStores.includes('documentCollections')) {
+          const mappingStore = db.createObjectStore('documentCollections', { keyPath: 'id', autoIncrement: true });
+          mappingStore.createIndex('documentId', 'documentId', { unique: false });
+          mappingStore.createIndex('collectionId', 'collectionId', { unique: false });
+        }
+      };
+      
+      openRequest.onsuccess = function(event) {
+        // Update global references
+        const newDb = event.target.result;
+        window.appState.db = newDb;
+        window.db = newDb;
+        resolve(true);
+      };
+      
+      openRequest.onerror = function(event) {
+        reject(new Error("Failed to upgrade schema: " + event.target.error));
+      };
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 // Attempt to reinitialize database
 function attemptDatabaseRepair() {
   const status = checkDatabaseStatus();
@@ -126,6 +258,7 @@ function createStandardSchema(db) {
   if (!existingStores.includes('blocks')) {
     const blockStore = db.createObjectStore('blocks', { keyPath: 'id', autoIncrement: true });
     blockStore.createIndex('standard', 'standard', { unique: false });
+    blockStore.createIndex('notes', 'notes', { unique: false }); // Added notes index
   }
   
   // Create other stores if needed
@@ -241,5 +374,7 @@ function diagnoseDatabaseIssues() {
 
 // Make functions available globally
 window.checkDatabaseStatus = checkDatabaseStatus;
+window.checkDatabaseSchema = checkDatabaseSchema;
+window.forceSchemaUpgrade = forceSchemaUpgrade;
 window.attemptDatabaseRepair = attemptDatabaseRepair;
 window.diagnoseDatabaseIssues = diagnoseDatabaseIssues;

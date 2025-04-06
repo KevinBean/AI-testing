@@ -22,6 +22,15 @@ $(document).ready(function() {
     showBlockModal();
   });
   
+  // Add event delegation for block list item clicks
+  $(document).on("click", ".block-item", function(e) {
+    // Only handle if not clicking on a button
+    if (!$(e.target).closest('button').length) {
+      const blockId = $(this).data("id");
+      viewBlock(blockId);
+    }
+  });
+  
   // Hook up save block button - ONLY attach to modal version if it exists
   $(document).on("click", "#saveBlockButton", function() {
     // Only execute if we're in a modal context or this handler isn't for the blocks.html page
@@ -35,6 +44,7 @@ $(document).ready(function() {
           const level = $(`#blockModalForm #blockLevel${i + 1}`).val();
           return level ? parseInt(level) : null;
         }),
+        notes: $("#blockModalForm #blockNotes").val().trim() || "",
         created: new Date().toISOString(),
         lastModified: new Date().toISOString()
       };
@@ -100,8 +110,18 @@ function initializeStandardAutocomplete(selector) {
         response(results.slice(0, 10));
       }
     },
-    minLength: 1
-  });
+    minLength: 1,
+    select: function(event, ui) {
+      // Set the value to the selected item's value (standard ID)
+      $(this).val(ui.item.value);
+      return false;
+    }
+  }).autocomplete("instance")._renderItem = function(ul, item) {
+    // Create a custom rendering for each item in the dropdown
+    return $("<li>")
+      .append(`<div class="ui-menu-item-with-icon"><strong>${item.value}</strong>: ${item.label.split(' - ')[1] || ''}</div>`)
+      .appendTo(ul);
+  };
 }
 
 // Initialize tag autocomplete with comma separation
@@ -141,6 +161,7 @@ function saveBlockFromForm(formSelector) {
   const content = $(formSelector + " #blockText").val().trim();
   const tagsString = $(formSelector + " #blockTags").val().trim();
   const standard = $(formSelector + " #blockStandard").val().trim();
+  const notes = $(formSelector + " #blockNotes").val().trim();
   
   // Get level values
   const levels = [];
@@ -163,6 +184,7 @@ function saveBlockFromForm(formSelector) {
     tags: tags,
     standard: standard || null,
     levels: levels,
+    notes: notes || "",
     created: new Date().toISOString(),
     lastModified: new Date().toISOString()
   };
@@ -194,6 +216,7 @@ function showBlockModal(blockId = null) {
             $("#blockModalForm #blockText").val(block.content || "");
             $("#blockModalForm #blockTags").val(block.tags ? block.tags.join(", ") : "");
             $("#blockModalForm #blockStandard").val(block.standard || "");
+            $("#blockModalForm #blockNotes").val(block.notes || "");
             
             // Set level values if they exist
             if (block.levels) {
@@ -227,6 +250,11 @@ function showBlockModal(blockId = null) {
 
 // Save block (create new or update existing)
 function saveBlock(block, formSelector) {
+  // Make sure notes is included in the block data
+  if (!block.hasOwnProperty('notes')) {
+    block.notes = "";
+  }
+  
   ensureDatabaseReady()
     .then(db => {
       const transaction = db.transaction(["blocks"], "readwrite");
@@ -293,7 +321,8 @@ function loadBlocks(searchTerm = '') {
             (block.title && block.title.toLowerCase().includes(searchLower)) || 
             (block.content && block.content.toLowerCase().includes(searchLower)) ||
             (block.standard && block.standard.toLowerCase().includes(searchLower)) ||
-            (block.tags && block.tags.some(tag => tag.toLowerCase().includes(searchLower)))
+            (block.tags && block.tags.some(tag => tag.toLowerCase().includes(searchLower))) ||
+            (block.notes && block.notes.toLowerCase().includes(searchLower)) // Added search in notes field
           );
         }
         
@@ -309,6 +338,56 @@ function loadBlocks(searchTerm = '') {
     .catch(err => {
       console.error("Database not ready when loading blocks:", err);
       showBlocksError("Database error. Please try refreshing the page.");
+    });
+}
+
+// Add a function to search specifically by notes
+function searchBlocksByNotes(noteText) {
+  if (!noteText) return;
+  
+  console.log("Searching blocks by notes containing:", noteText);
+  
+  ensureDatabaseReady()
+    .then(db => {
+      const transaction = db.transaction(["blocks"], "readonly");
+      const store = transaction.objectStore("blocks");
+      
+      // Use the notes index if it exists
+      let request;
+      if (store.indexNames.contains('notes')) {
+        // Use index for more efficient search
+        request = store.index('notes').openCursor();
+      } else {
+        // Fall back to searching all blocks
+        request = store.openCursor();
+      }
+      
+      const blocks = [];
+      
+      request.onsuccess = function(event) {
+        const cursor = event.target.result;
+        if (cursor) {
+          const block = cursor.value;
+          if (block.notes && block.notes.toLowerCase().includes(noteText.toLowerCase())) {
+            blocks.push(block);
+          }
+          cursor.continue();
+        } else {
+          // Display blocks with matching notes
+          renderBlocksList(blocks);
+          
+          if (blocks.length === 0) {
+            showNotification("No blocks found with notes containing: " + noteText, "info");
+          } else {
+            showNotification(`Found ${blocks.length} blocks with matching notes`, "success");
+          }
+        }
+      };
+      
+      request.onerror = function(event) {
+        console.error("Error searching blocks by notes:", event.target.error);
+        showBlocksError("Error searching. Please try again.");
+      };
     });
 }
 
@@ -359,79 +438,56 @@ function renderBlocksList(blocks) {
   
   // Add each block to the list
   blocks.forEach(block => {
-    // Create the list item
-    const listItem = $("<li>").addClass("list-group-item list-item");
-    
-    // Create the title and metadata
-    const titleElement = $("<div>").addClass("block-title");
-    
-    let titleText = block.title || `Block ${block.id}`;
-    if (block.standard) {
-      titleText = `${block.standard}: ${titleText}`;
-    }
-    
-    titleElement.html(`<strong>${escapeHtml(titleText)}</strong>`);
-    
-    // Create block metadata
-    const metaElement = $("<div>").addClass("block-meta small text-muted");
-    let metaText = `ID: ${block.id}`;
-    
-    if (block.tags && block.tags.length) {
-      metaText += ` • Tags: ${block.tags.join(", ")}`;
-    }
-    
-    metaElement.text(metaText);
-    
-    // Create the action buttons
-    const actionButtons = $("<div>").addClass("action-buttons mt-2");
-    
-    // View button
-    const viewBtn = $("<button>")
-      .addClass("btn btn-sm btn-outline-primary action-btn mr-1")
-      .html('<i class="fas fa-eye"></i> View')
-      .click(function(e) {
-        e.stopPropagation();
-        viewBlock(block.id);
-      });
-    
-    // Edit button
-    const editBtn = $("<button>")
-      .addClass("btn btn-sm btn-warning action-btn mr-1")
-      .html('<i class="fas fa-edit"></i> Edit')
-      .click(function(e) {
-        e.stopPropagation();
-        showBlockModal(block.id);
-      });
-    
-    // Delete button
-    const deleteBtn = $("<button>")
-      .addClass("btn btn-sm btn-danger action-btn")
-      .html('<i class="fas fa-trash"></i> Delete')
-      .click(function(e) {
-        e.stopPropagation();
-        deleteBlock(block.id);
-      });
-    
-    // Add buttons to action container
-    actionButtons.append(viewBtn, editBtn, deleteBtn);
-    
-    // Add all elements to the list item
-    listItem.append(titleElement, metaElement, actionButtons);
-    
-    // Add click handler for the list item
-    listItem.click(function() {
-      viewBlock(block.id);
-    });
-    
-    // Add the list item to the block list
+    const listItem = generateBlockListItem(block);
     blockList.append(listItem);
   });
+  
+  // Make sure the items are clickable (add this indicator for clarity)
+  $(".block-item").addClass("list-item");
+}
+
+// Generate block list item
+function generateBlockListItem(block) {
+  let tagsHtml = '';
+  if (block.tags && block.tags.length > 0) {
+    tagsHtml = block.tags.map(tag => `<span class="badge badge-info">${escapeHtml(tag)}</span>`).join(' ');
+  }
+  
+  let standardBadge = '';
+  if (block.standard) {
+    standardBadge = `<span class="badge badge-secondary">${escapeHtml(block.standard)}</span>`;
+  }
+  
+  // Add notes indicator icon if block has notes
+  const notesIndicator = block.notes && block.notes.trim() ? 
+    '<i class="fas fa-sticky-note text-warning ml-1" title="Has notes"></i>' : '';
+  
+  return `
+    <li class="list-group-item block-item" data-id="${block.id}">
+      <div class="d-flex justify-content-between align-items-center">
+        <span class="block-title">${escapeHtml(block.title)}${notesIndicator}</span>
+        <div class="block-actions">
+          <button class="btn btn-sm btn-link edit-block-btn" data-id="${block.id}" title="Edit">
+            <i class="fas fa-edit"></i>
+          </button>
+          <button class="btn btn-sm btn-link delete-block-btn" data-id="${block.id}" title="Delete">
+            <i class="fas fa-trash text-danger"></i>
+          </button>
+        </div>
+      </div>
+      <div class="block-tags small mt-1">
+        ${tagsHtml} ${standardBadge}
+      </div>
+    </li>
+  `;
 }
 
 // View a block's details
 function viewBlock(blockId) {
   // Set the selected block
   selectedBlockId = blockId;
+  
+  console.log("Viewing block:", blockId); // Add this for debugging
   
   // Fetch the block data
   fetchBlockById(blockId, function(block) {
@@ -492,7 +548,9 @@ function viewBlock(blockId) {
       $("#blockDetailView").show();
       
       // Hide the form section if it's visible
-      $("#blockFormSection").hide();
+      if ($("#blockFormSection").length) {
+        $("#blockFormSection").hide();
+      }
       
       // Attach action handlers
       $(".edit-block-btn").click(function() {
@@ -508,6 +566,11 @@ function viewBlock(blockId) {
       // Highlight the selected block in the list
       $("#blockList .list-group-item").removeClass("active");
       $(`#blockList .list-group-item[data-id="${blockId}"]`).addClass("active");
+      
+      // Display notes if the notes display element exists
+      if ($(".block-notes-display").length) {
+        $(".block-notes-display").text(block.notes || "No notes added");
+      }
     } else {
       showNotification(`Block with ID ${blockId} not found`, "warning");
     }
@@ -566,12 +629,25 @@ async function updateStandardAutocomplete() {
         if(cursor) {
           const std = cursor.value;
           standardAutocomplete.push({ 
-            label: std.id + " - " + std.name + (std.type ? ` (${std.type})` : ""), 
+            // Label includes both ID and name for filtering
+            label: std.id + " - " + (std.name || ""),
+            // Value is just the ID for the input field
             value: std.id 
           });
           cursor.continue();
         } else {
           console.log("Standards autocomplete updated with", standardAutocomplete.length, "items");
+          
+          // Initialize or update the autocomplete for any existing fields
+          $("#blockStandard, #blockModalForm #blockStandard").each(function() {
+            if ($(this).autocomplete("instance")) {
+              $(this).autocomplete("option", "source", function(request, response) {
+                const results = $.ui.autocomplete.filter(standardAutocomplete, request.term);
+                response(results.slice(0, 10));
+              });
+            }
+          });
+          
           resolve(standardAutocomplete);
         }
       };
