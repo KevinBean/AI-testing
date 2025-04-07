@@ -51,12 +51,47 @@
       100% { background-color: transparent; }
     }
 
-    /* Tag Tree Styling */
-    .tag-tree { list-style-type: none; padding-left: 20px; }
-    .tag-tree-root { padding-left: 0; }
-    .tag-tree-item { display: flex; align-items: center; cursor: pointer; }
-    .tag-tree-toggle { cursor: pointer; }
-    .tag-tree-btn { margin-left: 5px; }
+    /* Enhanced Tag Tree Styling */
+    .tag-tree { 
+      list-style-type: none; 
+      padding-left: 5px;
+      margin-bottom: 5px;
+    }
+    .tag-tree-root { 
+      padding-left: 0; 
+      border-left: none;
+    }
+    .tag-tree-item { 
+      display: flex; 
+      align-items: center; 
+      margin-bottom: 5px;
+    }
+    .tag-tree-toggle { 
+      cursor: pointer; 
+      transition: transform 0.2s;
+      width: 15px;
+      color: #6c757d;
+    }
+    .tag-tree-btn { 
+      margin-left: 0px; 
+      text-align: left;
+      padding: 0.15rem 0.5rem;
+      font-size: 0.85rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
+      transition: all 0.2s;
+    }
+    .tag-tree-btn:hover {
+      transform: translateX(2px);
+    }
+    li .tag-tree {
+      border-left: 1px dotted #dee2e6;
+      padding-top: 5px;
+      padding-bottom: 2px;
+      margin-left: 10px; /* Add left margin to nested lists */
+    }
   </style>
 </head>
 <body>
@@ -394,38 +429,41 @@
             <div id="tagCloud" class="mb-4"></div>
             <div id="tagTreeContainer" class="mb-4"></div>
           </div>
-          <div class="col-md-5 preview-col">
-            <div class="row">
-              <div class="col-md-12">
-                <div class="section-title">Content Tagged with: <span id="selectedTagName">All Tags</span></div>
-                <ul class="nav nav-tabs" id="tagContentTabs" role="tablist">
-                  <li class="nav-item">
-                    <a class="nav-link active" id="tag-blocks-tab" data-toggle="tab" href="#tagBlocksContent" role="tab">Blocks</a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" id="tag-documents-tab" data-toggle="tab" href="#tagDocumentsContent" role="tab">Documents</a>
-                  </li>
-                </ul>
-                <div class="tab-content border border-top-0 p-3">
-                  <div class="tab-pane fade show active" id="tagBlocksContent" role="tabpanel">
-                    <div id="taggedBlocksList"></div>
-                  </div>
-                  <div class="tab-pane fade" id="tagDocumentsContent" role="tabpanel">
-                    <div id="taggedDocumentsList"></div>
+          <div class="col-md-9">
+            <div class="row-md-4">
+              <div class="card mb-4">
+                <div class="card-header">Tag Management</div>
+                <div class="card-body">
+                  <div class="help-tip">
+                    <p><strong>What are Tags?</strong> Tags are labels that help you categorize and find content across blocks, references, and documents.</p>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div class="col-md-4 editor-col">
-            <div class="card mb-4">
-              <div class="card-header">Tag Management</div>
-              <div class="card-body">
-                <div class="help-tip">
-                  <p><strong>What are Tags?</strong> Tags are labels that help you categorize and find content across blocks, references, and documents.</p>
+            <div class="row-md-5">
+              <div class="row">
+                <div class="card col-md-12">
+                  <div class="card-header">Content Tagged with: <span id="selectedTagName">All Tags</span></div>
+                  <ul class="nav nav-tabs" id="tagContentTabs" role="tablist">
+                    <li class="nav-item">
+                      <a class="nav-link active" id="tag-blocks-tab" data-toggle="tab" href="#tagBlocksContent" role="tab">Blocks</a>
+                    </li>
+                    <li class="nav-item">
+                      <a class="nav-link" id="tag-documents-tab" data-toggle="tab" href="#tagDocumentsContent" role="tab">Documents</a>
+                    </li>
+                  </ul>
+                  <div class="tab-content border border-top-0 p-3">
+                    <div class="tab-pane fade show active" id="tagBlocksContent" role="tabpanel">
+                      <div id="taggedBlocksList"></div>
+                    </div>
+                    <div class="tab-pane fade" id="tagDocumentsContent" role="tabpanel">
+                      <div id="taggedDocumentsList"></div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+
           </div>
         </div>
       </div>
@@ -2689,7 +2727,9 @@
           let currentLevel = tree;
           parts.forEach((part, idx) => {
             if (!currentLevel.children[part]) {
-              currentLevel.children[part] = { name: part, children: {}, count: 0 };
+              currentLevel.children[part] = { name: part, children: {}, count: 0,
+            // Store the path up to this level for navigation purposes
+            path: parts.slice(0, idx + 1).join('/') };
             }
             
             // If it's a leaf node (final part of the path), add the count
@@ -2717,11 +2757,12 @@
       return tree;
     }
     
-    // Function to render the tag tree
+    // Enhanced renderTagTree function with better support for deep nesting
     function renderTagTree(treeNode, container, level = 0) {
       const childrenKeys = Object.keys(treeNode.children).sort();
       if (childrenKeys.length === 0) return;
       
+      // 👇 CHANGED: Each level should get its own UL for proper nesting
       const ul = $('<ul>').addClass('tag-tree');
       if (level === 0) ul.addClass('tag-tree-root');
       
@@ -2729,7 +2770,10 @@
         const child = treeNode.children[key];
         const hasChildren = Object.keys(child.children).length > 0;
         
-        const li = $('<li>');
+        // 👇 CHANGED: Improved indent with more visual spacing per level
+        const li = $('<li>').css('margin-left', `${level * 12}px`);
+        
+        // Visual indicator of hierarchy level
         const tagItem = $('<div>').addClass('tag-tree-item');
         
         // Add toggle icon for nodes with children
@@ -2737,22 +2781,36 @@
           const toggleIcon = $('<i>').addClass('fas fa-caret-right tag-tree-toggle mr-1');
           tagItem.append(toggleIcon);
           
-          // Add click handler to toggle icon
+          // 👇 CHANGED: Improved toggle behavior to properly show/hide deeply nested children
           toggleIcon.click(function(e) {
             e.stopPropagation();
-            const nestedUl = $(this).closest('li').find('> ul');
+            const nestedUl = $(this).closest('li').children('ul').first();
             nestedUl.toggle();
             $(this).toggleClass('fa-caret-right fa-caret-down');
           });
         } else {
+          // Add indentation for leaf nodes to align with parent toggles
           tagItem.append($('<i>').addClass('fas fa-tag mr-1 text-muted'));
         }
         
-        // Create the tag button with count badge
+        // 👇 CHANGED: Visual enhancements to better show the tag hierarchy level
         const tagBtn = $('<button>')
           .addClass('btn btn-sm btn-outline-info tag-tree-btn')
-          .text(child.name)
-          .append($('<span>').addClass('badge badge-light ml-1').text(child.count));
+          .text(child.name);
+          
+        // 👇 CHANGED: Better visual cue for depth with increasing color intensity
+        if (level > 0) {
+          // Gradient border color that gets darker with depth
+          const opacity = Math.min(0.4 + (level * 0.15), 1.0);
+          const hue = 180 + (level * 10); // Slight hue change by level
+          tagBtn.css('border-left', `4px solid hsla(${hue}, 70%, 40%, ${opacity})`);
+          
+          // Add indentation marker to show the hierarchy
+          tagBtn.prepend(`<span class="text-muted mr-1">${'•'.repeat(level)}</span>`);
+        }
+        
+        // Add count badge
+        tagBtn.append($('<span>').addClass('badge badge-light ml-1').text(child.count));
         
         // Add click handler to trigger tag filtering
         if (child.fullPath) {
@@ -2767,14 +2825,15 @@
         tagItem.append(tagBtn);
         li.append(tagItem);
         
-        // Recursively build child nodes
+        // 👇 CHANGED: Recursively build child nodes with proper DOM nesting
         if (hasChildren) {
-          const childContainer = renderTagTree(child, li, level + 1);
-          if (level > 0) {
-            // Hide nested levels by default
-            childContainer.hide();
+          const childUl = renderTagTree(child, li, level + 1);
+          li.append(childUl);
+          
+          // 👇 CHANGED: Only hide deeper levels (3+) by default for better UX
+          if (level >= 2) {
+            childUl.hide();
           }
-          li.append(childContainer);
         }
         
         ul.append(li);
