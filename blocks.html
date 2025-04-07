@@ -1781,6 +1781,8 @@
             <button type="button" class="btn btn-outline-secondary move-down-btn"><i class="fas fa-arrow-down"></i></button>
             <button type="button" class="btn btn-outline-danger remove-para-btn"><i class="fas fa-trash"></i></button>
           </div>
+          <label>Paragraph Title</label>
+          <input type="text" class="form-control paraTitle mb-2" placeholder="Enter paragraph title (optional)">
           <label>Paragraph Content (Markdown)</label>
           <textarea class="form-control docParagraph" rows="6" placeholder="Enter markdown content"></textarea>
           
@@ -2060,6 +2062,7 @@
       
       $(".paragraph-block").each(function(i) {
         const content = $(this).find(".docParagraph").val();
+        const paraTitle = $(this).find(".paraTitle").val().trim();
         
         // Get all block references in this paragraph
         const blockRefs = [];
@@ -2075,7 +2078,8 @@
         const tags = tagsStr ? tagsStr.split(/,\s*/).filter(t => t.trim()) : [];
         
         // Start building the paragraph HTML
-        let paragraphHTML = `<div class="mb-3"><p><strong>Paragraph ${i+1}:</strong></p>${marked.parse(content)}`;
+        const paraTitleHTML = paraTitle ? `<h4>${paraTitle} (Paragraph ${i+1})</h4>` : `<h4>Paragraph ${i+1}</h4>`;
+        let paragraphHTML = `<div class="mb-3">${marked.parse(content)}`;
         
         // Display paragraph tags if present
         if(tags.length) {
@@ -2157,6 +2161,7 @@
       const paragraphs = [];
       $(".paragraph-block").each(function() {
         const content = $(this).find(".docParagraph").val();
+        const paraTitle = $(this).find(".paraTitle").val().trim();
         
         // Collect all block references
         const blockRefs = [];
@@ -2172,6 +2177,7 @@
         const tags = tagsStr ? tagsStr.split(/,\s*/).filter(t => t.trim()) : [];
         
         paragraphs.push({ 
+          title: paraTitle, // Paragraph title
           content, 
           blockRefs: blockRefs.length > 0 ? blockRefs : [], // Array of block references
           tags: tags 
@@ -2260,7 +2266,11 @@
     function previewDocument(doc) {
       let html = "<div class='card-header'><strong>" + doc.title + "</strong>(ID:" + doc.id + ')<div class="btn-group float-right"><button class="btn btn-sm btn-warning edit-doc-btn">Edit</button><button class="btn btn-sm btn-danger delete-doc-btn">Delete</button></div></div>';
       doc.paragraphs.forEach((p, i) => {
-        html += `<div class="card-body"><p><strong>Paragraph ${i+1}:</strong></p>${marked.parse(p.content)}`;
+        // Add paragraph title if available
+        const paragraphTitle = p.title ? `<h5 class="mb-2">${p.title}</h5>` : `<strong>Paragraph ${i+1}</strong>`;
+    
+        html += `<div class="card-body"><div class="paragraph-header">${paragraphTitle}</div>${marked.parse(p.content)}`;
+
         
         // Display paragraph tags if present
         if(p.tags && p.tags.length) {
@@ -2316,6 +2326,8 @@
               <button type="button" class="btn btn-outline-secondary move-down-btn"><i class="fas fa-arrow-down"></i></button>
               <button type="button" class="btn btn-outline-danger remove-para-btn"><i class="fas fa-trash"></i></button>
             </div>
+            <label>Paragraph Title</label>
+            <input type="text" class="form-control paraTitle mb-2" placeholder="Enter paragraph title (optional)">
             <label>Paragraph Content (Markdown)</label>
             <textarea class="form-control docParagraph" rows="6" placeholder="Enter markdown content"></textarea>
             
@@ -2337,6 +2349,8 @@
         `);
         paragraphContainer.append(block);
         block.find(".docParagraph").val(p.content);
+
+        block.find(".paraTitle").val(p.title || '');
         
         // Get block references (handle both old and new format)
         const blockRefs = p.blockRefs || (p.blockRef ? [p.blockRef] : []);
