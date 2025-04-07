@@ -1094,7 +1094,6 @@
         store.add(block).onsuccess = function() {
           showNotification("New block added!");
           $("#blockForm")[0].reset();
-          $("#blockForm").hide();
           loadBlocks();
           updateBlockAutocomplete();
         };
