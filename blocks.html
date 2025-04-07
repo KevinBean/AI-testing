@@ -138,6 +138,11 @@
                       <a href="#" data-toggle="tooltip" title="Use Markdown formatting: **bold**, *italic*, etc."><i class="fas fa-question-circle"></i></a>
                       <textarea id="blockText" class="form-control docParagraph" rows="6" placeholder="Enter block text in Markdown" required></textarea>
                     </div>
+                    <div class="form-group">
+                      <label for="blockNotes">Notes</label>
+                      <a href="#" data-toggle="tooltip" title="Private notes for this block (not included in exports/references)"><i class="fas fa-question-circle"></i></a>
+                      <textarea id="blockNotes" class="form-control" rows="2" placeholder="Enter optional notes about this block"></textarea>
+                    </div>
                     <div class="row">
                       <div class="col-md-8">
                         <label for="blockTags">Tags</label>
@@ -201,12 +206,12 @@
                   <form id="referenceForm" class="mb-3">
                     <div class="form-row">
                       <div class="form-group col-md-6">
-                        <label for="refId">Reference ID</label>
+                        <label for="refId" class="required-field">Reference ID</label>
                         <a href="#" data-toggle="tooltip" title="Use a unique identifier for this reference"><i class="fas fa-question-circle"></i></a>
                         <input type="text" id="refId" class="form-control" placeholder="Unique ID" required>
                       </div>
                       <div class="form-group col-md-6">
-                        <label for="refType">Reference Type</label>
+                        <label for="refType" class="required-field">Reference Type</label>
                         <select id="refType" class="form-control" required>
                           <option value="">Select Type...</option>
                           <option value="standard">Standard</option>
@@ -219,7 +224,7 @@
                     </div>
                     <div class="form-row">
                       <div class="form-group col-md-12">
-                        <label for="refName">Title</label>
+                        <label for="refName" class="required-field">Title</label>
                         <input type="text" id="refName" class="form-control" placeholder="Reference Title" required>
                       </div>
                     </div>
@@ -285,7 +290,7 @@
                   </div>
                   <form id="documentForm">
                     <div class="form-group">
-                      <label for="docTitle">Document Title</label>
+                      <label for="docTitle" class="required-field">Document Title</label>
                       <input type="text" id="docTitle" class="form-control" placeholder="Document Title" required>
                     </div>
                     <div class="section-title">Paragraphs <small>(Drag to reorder)</small></div>
@@ -335,7 +340,7 @@
                   </div>
                   <form id="collectionForm">
                     <div class="form-group">
-                      <label for="collectionName">Collection Name</label>
+                      <label for="collectionName" class="required-field">Collection Name</label>
                       <input type="text" class="form-control" id="collectionName" required>
                     </div>
                     <div class="form-group">
@@ -468,7 +473,7 @@
                 </div>
                 <form id="actionForm">
                   <div class="form-group">
-                    <label for="actionTitle">Title</label>
+                    <label for="actionTitle" class="required-field">Title</label>
                     <input type="text" id="actionTitle" class="form-control" placeholder="Action name" required>
                   </div>
                   <div class="form-group">
@@ -481,7 +486,7 @@
                   </div>
                   <div class="form-row">
                     <div class="form-group col-md-6">
-                      <label for="actionModel">AI Model</label>
+                      <label for="actionModel" class="required-field">AI Model</label>
                       <input type="text" id="actionModel" class="form-control" list="modelOptions" placeholder="Enter or select model" required>
                       <datalist id="modelOptions">
                         <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
@@ -526,7 +531,7 @@
                     </small>
                   </div>
                   <div class="form-group">
-                    <label for="actionPrompt">Prompt Template</label>
+                    <label for="actionPrompt" class="required-field">Prompt Template</label>
                     <div class="help-tip mb-2">
                       <p>Use <code>{content}</code> as placeholder for the input content</p>
                     </div>
@@ -581,7 +586,7 @@
                 </div>
                 <form id="workflowForm">
                   <div class="form-group">
-                    <label for="workflowName">Workflow Name</label>
+                    <label for="workflowName" class="required-field">Workflow Name</label>
                     <input type="text" class="form-control" id="workflowName" required>
                   </div>
                   <div class="form-group">
@@ -1041,7 +1046,7 @@
         if (cursor) {
           const block = cursor.value;
           const title = block.title || "Block " + block.id;
-          blockAutocomplete.push({ label: title + " (ID:" + block.id + ")", value: block.id });
+          blockAutocomplete.push({ label: title + " (ID:" + block.id + ") - " + block.text + " - " + block.notes, value: block.id });
           cursor.continue();
         }
       };
@@ -1059,6 +1064,7 @@
       e.preventDefault();
       const title = $("#blockTitle").val().trim();
       const text = $("#blockText").val().trim();
+      const notes = $("#blockNotes").val().trim(); // Get notes
       const tags = $("#blockTags").val().split(",").map(s => s.trim()).filter(s => s);
       // The reference must be selected from the autocomplete (i.e. a valid reference id)
       const reference = $("#blockReference").val().trim();
@@ -1076,6 +1082,7 @@
           let block = e.target.result;
           block.title = title;
           block.text = text;
+          block.notes = notes; // Update notes
           block.tags = tags;
           block.reference = reference;
           block.refLevels = refLevels;
@@ -1090,7 +1097,7 @@
           };
         };
       } else {
-        const block = { title, text, tags, reference, refLevels, created: new Date() };
+        const block = { title, text, notes, tags, reference, refLevels, created: new Date() };
         store.add(block).onsuccess = function() {
           showNotification("New block added!");
           $("#blockForm")[0].reset();
@@ -1137,6 +1144,7 @@
       editingBlockId = block.id;
       $("#blockTitle").val(block.title || "");
       $("#blockText").val(block.text);
+      $("#blockNotes").val(block.notes || ""); // Set notes
       $("#blockTags").val(block.tags.join(", "));
       $("#blockReference").val(block.reference);
       for(let i=1; i<=6; i++){
@@ -1202,6 +1210,8 @@
           </div>
           <div class="card-body">
             ${renderedText}
+
+            <div class="mt-2"><strong>Notes:</strong> ${block.notes || "No notes available."}</div>
             
             ${block.tags && block.tags.length ? 
               `<div class="mt-2">Tags: ${block.tags.map(t => `<span class="badge badge-info mr-1">${t}</span>`).join('')}</div>` : ''}
@@ -1512,6 +1522,14 @@
                   html += "<strong>" + block.refLevels.join(".") + "</strong>";
                 }
                 html += ": <strong>" + (block.title || "Block " + block.id) + "</strong> - " + marked.parse(block.text);
+                // Add tags if available
+                if(block.tags && block.tags.length) {
+                  html += " <span class='badge badge-info'>" + block.tags.join("</span> <span class='badge badge-info'>") + "</span>";
+                }
+                // Add notes if available
+                if(block.notes) {
+                  html += "<br><small>Notes: " + block.notes + "</small>";
+                }
                 html += `<div class="btn-group float-right"><button class="btn btn-sm btn-outline-primary edit-ref-block-btn ml-2" data-block-id="${block.id}">Edit</button></div>`;
                 html += "</li>";
               });
