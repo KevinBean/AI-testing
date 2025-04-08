@@ -136,6 +136,10 @@
       <div class="tab-pane fade show active" id="blocksView" role="tabpanel">
         <div class="row">
           <div class="col-md-3">
+            <!-- Add New Block -->
+            <div class="mb-2">
+              <button id="addBlockBtn" class="btn btn-primary btn-block mt-3">Add New Block</button>
+            </div>
             <!-- Blocks Search-->
             <div class="mb-2">
               <input type="text" id="blockSearch" class="form-control" placeholder="Search blocks...">
@@ -144,8 +148,6 @@
             <!-- Blocks List -->
             <div class="section-title">Saved Blocks <small>(Click on Edit to modify a block)</small></div>
             <ul id="blockList" class="list-group"></ul>
-            <!-- Add New Block -->
-            <button id="addBlockBtn" class="btn btn-primary btn-block mt-3">Add New Block</button>
           </div>
           
           <div class = "col-md-9">
@@ -1072,6 +1074,48 @@
     };
     request.onerror = function(e) { console.error("DB error:", e.target.error); };
 
+
+    /**
+     * Creates a highlighted excerpt of text containing a search term
+     * 
+     * @param {string} fullText - The complete text to search within
+     * @param {string} searchTerm - The term to search for and highlight
+     * @param {number} contextSize - Number of characters to include before and after the match (default: 50)
+     * @return {string} - Rendered HTML with highlighted search term and context, or the original text if no match
+     */
+    function getHighlightedSearchContext(fullText, searchTerm, contextSize = 50) {
+      // If no search term or it's empty, return the original rendered text
+      if (!searchTerm || searchTerm.trim() === "") {
+        return marked.parse(fullText);
+      }
+      
+      // Create a context window around the matched term
+      const lowerText = fullText.toLowerCase();
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      const matchIndex = lowerText.indexOf(lowerSearchTerm);
+      
+      if (matchIndex >= 0) {
+        // Extract context (about contextSize chars before and after)
+        const startPos = Math.max(0, matchIndex - contextSize);
+        const endPos = Math.min(fullText.length, matchIndex + searchTerm.length + contextSize);
+        let extractedText = fullText.substring(startPos, endPos);
+        
+        // Add ellipses if we're not showing from the beginning/end
+        if (startPos > 0) extractedText = "..." + extractedText;
+        if (endPos < fullText.length) extractedText += "...";
+        
+        // Highlight the matched term with mark tags
+        const highlightRegex = new RegExp('(' + searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+        const highlightedText = extractedText.replace(highlightRegex, '<mark>$1</mark>');
+        
+        // Render only the extracted part with highlight
+        return marked.parse(highlightedText);
+      }
+      
+      // If no match found, return the original rendered text
+      return marked.parse(fullText);
+    }
+
     /**********************
      * Block Management (Markdown) - Checked
      **********************/
@@ -1156,7 +1200,7 @@
           const title = block.title || "Block " + block.id;
           const combinedText = (title + " " + block.text + " " + block.tags.join(" ") + " " + (block.reference || "")).toLowerCase();
           if(combinedText.indexOf(searchTerm.toLowerCase()) !== -1) {
-            let renderedText = marked.parse(block.text);
+            let renderedText = getHighlightedSearchContext(block.text, searchTerm);
             let display = "<strong>" + title + "</strong><br>" + renderedText;
             if(block.tags.length) display += " <span class='badge badge-info'>" + block.tags.join("</span> <span class='badge badge-info'>") + "</span><br>";
             if(block.reference) {
