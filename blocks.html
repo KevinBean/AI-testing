@@ -2248,6 +2248,7 @@
       
       const title = $("#docTitle").val().trim();
       const paragraphs = [];
+      let combinedContent = ""; // This will hold the combined content
       $(".paragraph-block").each(function() {
         const content = $(this).find(".docParagraph").val();
         const paraTitle = $(this).find(".paraTitle").val().trim();
@@ -2271,6 +2272,14 @@
           blockRefs: blockRefs.length > 0 ? blockRefs : [], // Array of block references
           tags: tags 
         });
+
+        // Add to combined content with formatting
+        if (paraTitle) {
+          combinedContent += `## ${paraTitle}\n\n`;
+        } else {
+          combinedContent += `## Paragraph ${index + 1}\n\n`;
+        }
+        combinedContent += content + "\n\n";
       });
       
       try {
@@ -2287,6 +2296,7 @@
             let doc = e.target.result;
             doc.title = title;
             doc.paragraphs = paragraphs;
+            doc.combinedContent = combinedContent; // Add combined content
             doc.updated = new Date();
             store.put(doc).onsuccess = function() {
               showNotification("Document updated successfully!");
@@ -2299,7 +2309,7 @@
             };
           };
         } else {
-          store.add({ title, paragraphs, created: new Date() }).onsuccess = function() {
+          store.add({ title, paragraphs, combinedContent, created: new Date() }).onsuccess = function() {
             showNotification("New document created!");
             $("#documentForm")[0].reset();
             paragraphContainer.empty();
@@ -2329,12 +2339,19 @@
           const cursor = e.target.result;
           if(cursor) {
             const doc = cursor.value;
-            let combinedContent = doc.title;
-            doc.paragraphs.forEach(p => {
-              combinedContent += " " + p.content.replace(/<[^>]+>/g, "");
-            });
-            if(combinedContent.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1) {
-              const li = $(`<li class="list-group-item list-item">${doc.title}</li>`);
+            // Use combinedContent for searching if available
+            let searchableText = doc.title + " " + (doc.combinedContent || "");
+            
+            // Fall back to paragraph-by-paragraph search if no combinedContent
+            if (!doc.combinedContent) {
+              doc.paragraphs.forEach(p => {
+                searchableText += " " + p.content.replace(/<[^>]+>/g, "");
+              });
+            }
+            if(searchableText.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1) {
+              let renderedText = getHighlightedSearchContext(doc.combinedContent, searchTerm);
+              let display = "<strong>" + doc.title + "</strong><br>" + renderedText;
+              const li = $(`<li class="list-group-item list-item">${display}</li>`);
               li.click(function(){ previewDocument(doc); });
               $("#docList").append(li);
             }
