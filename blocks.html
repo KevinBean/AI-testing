@@ -1385,7 +1385,7 @@
                   $('html, body').animate({
                     scrollTop: paraElement.offset().top - 100
                   }, 500);
-                  setTimeout(() => paraElement.removeClass("highlight-paragraph"), 3000);
+                  setTimeout(() => paraElement.removeClass("highlight-paragraph"), 120000);
                 }
               }, 500);
             }
@@ -2026,7 +2026,7 @@
                 $(this).closest(".paragraph-block").find(".alert").fadeOut('slow', function() {
                   $(this).remove();
                 });
-              }, 3000);
+              }, 120000);
             } else {
               alert("Block not found!");
             }
@@ -2334,7 +2334,7 @@
               combinedContent += " " + p.content.replace(/<[^>]+>/g, "");
             });
             if(combinedContent.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1) {
-              const li = $(`<li class="list-group-item list-item">ID: ${doc.id} | ${doc.title}</li>`);
+              const li = $(`<li class="list-group-item list-item">${doc.title}</li>`);
               li.click(function(){ previewDocument(doc); });
               $("#docList").append(li);
             }
@@ -2580,7 +2580,7 @@
                   paragraphBlock.find(".alert").fadeOut('slow', function() {
                     $(this).remove();
                   });
-                }, 3000);
+                }, 120000);
               } else {
                 alert("Block not found!");
               }
@@ -2662,7 +2662,7 @@
                   $(this).closest(".paragraph-block").find(".alert").fadeOut('slow', function() {
                     $(this).remove();
                   });
-                }, 3000);
+                }, 120000);
               } else {
                 alert("Block not found!");
               }
