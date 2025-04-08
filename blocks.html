@@ -180,7 +180,18 @@
                     <div class="form-group">
                       <label for="blockText" class="required-field">Block Text (Markdown)</label>
                       <a href="#" data-toggle="tooltip" title="Use Markdown formatting: **bold**, *italic*, etc."><i class="fas fa-question-circle"></i></a>
+                      <!-- Toolbar for Markdown insertion -->
+                      <div class="btn-group mb-2" id="blockTextToolbar">
+                        <button type="button" class="btn btn-light insert-bold">Bold</button>
+                        <button type="button" class="btn btn-light insert-italic">Italic</button>
+                        <button type="button" class="btn btn-light insert-equation">Equation</button>
+                        <button type="button" class="btn btn-light insert-mermaid">Mermaid</button>
+                        <button type="button" class="btn btn-light toggle-preview">Toggle Preview</button>
+                      </div>
+                      <!-- Textarea for editing -->
                       <textarea id="blockText" class="form-control docParagraph" rows="6" placeholder="Enter block text in Markdown" required></textarea>
+                      <!-- A container for preview (will be created dynamically, if desired) -->
+                      <div id="blockTextPreview" class="border p-2 mt-2" style="display:none;"></div>
                     </div>
                     <div class="form-group">
                       <label for="blockNotes">Notes</label>
@@ -1164,6 +1175,30 @@ $$</code></pre>
       // If no match found, return the original rendered text
       return renderMarkdown(fullText);
     }
+    // For the editor, we need to insert the text at the cursor position
+    function insertAtCursor(myField, myValue) {
+      // For browsers like IE
+      if (document.selection) {
+          myField.focus();
+          let sel = document.selection.createRange();
+          sel.text = myValue;
+          myField.focus();
+      } else if (myField.selectionStart || myField.selectionStart === 0) {
+          let startPos = myField.selectionStart;
+          let endPos = myField.selectionEnd;
+          myField.value = myField.value.substring(0, startPos)
+              + myValue
+              + myField.value.substring(endPos, myField.value.length);
+          // Reposition the cursor after inserted text
+          myField.selectionStart = startPos + myValue.length;
+          myField.selectionEnd = startPos + myValue.length;
+          myField.focus();
+      } else {
+          myField.value += myValue;
+          myField.focus();
+      }
+    }
+
 
     /**********************
      * Block Management (Markdown) - Checked
@@ -1182,6 +1217,8 @@ $$</code></pre>
         }
       };
     }
+
+
 
     $("#addBlockBtn").on("click", function() {
       $("#blockForm")[0].reset();
@@ -1921,7 +1958,17 @@ $$</code></pre>
           <label>Paragraph Title</label>
           <input type="text" class="form-control paraTitle mb-2" placeholder="Enter paragraph title (optional)">
           <label>Paragraph Content (Markdown)</label>
-          <textarea class="form-control docParagraph" rows="6" placeholder="Enter markdown content"></textarea>
+          <div class="paragraph-editor mb-3">
+            <div class="btn-group mb-2">
+              <button type="button" class="btn btn-light insert-bold">Bold</button>
+              <button type="button" class="btn btn-light insert-italic">Italic</button>
+              <button type="button" class="btn btn-light insert-equation">Equation</button>
+              <button type="button" class="btn btn-light insert-mermaid">Mermaid</button>
+              <button type="button" class="btn btn-light toggle-preview">Toggle Preview</button>
+            </div>
+            <textarea class="docParagraph form-control" rows="4" placeholder="Enter paragraph text"></textarea>
+            <div id="paragraphTextPreview" class="preview mt-2" style="display:none; border: 1px solid #ccc; padding: 10px;"></div>
+          </div>
           
           <div class="row mt-2">
             <div class="col-md-8">
@@ -2485,7 +2532,17 @@ $$</code></pre>
             <label>Paragraph Title</label>
             <input type="text" class="form-control paraTitle mb-2" placeholder="Enter paragraph title (optional)">
             <label>Paragraph Content (Markdown)</label>
-            <textarea class="form-control docParagraph" rows="6" placeholder="Enter markdown content"></textarea>
+            <div class="paragraph-editor mb-3">
+              <div class="btn-group mb-2">
+                <button type="button" class="btn btn-light insert-bold">Bold</button>
+                <button type="button" class="btn btn-light insert-italic">Italic</button>
+                <button type="button" class="btn btn-light insert-equation">Equation</button>
+                <button type="button" class="btn btn-light insert-mermaid">Mermaid</button>
+                <button type="button" class="btn btn-light toggle-preview">Toggle Preview</button>
+              </div>
+              <textarea class="docParagraph form-control" rows="4" placeholder="Enter paragraph text"></textarea>
+              <div id="paragraphTextPreview" class="preview mt-2" style="display:none; border: 1px solid #ccc; padding: 10px;"></div>
+            </div>
             
             <div class="row mt-2">
               <div class="col-md-8">
@@ -6163,6 +6220,69 @@ $$</code></pre>
         }
       }, 100);
     }
+
+    $(document).ready(function() {
+      // Block Editor Toolbar
+      $("#blockTextToolbar .insert-bold").click(function() {
+          insertAtCursor(document.getElementById("blockText"), "**bold text**");
+      });
+      $("#blockTextToolbar .insert-italic").click(function() {
+          insertAtCursor(document.getElementById("blockText"), "*italic text*");
+      });
+      $("#blockTextToolbar .insert-equation").click(function() {
+          // Inserts a display math equation (modify as needed)
+          insertAtCursor(document.getElementById("blockText"), "\n$$\n equation \n$$\n");
+      });
+      $("#blockTextToolbar .insert-mermaid").click(function() {
+          // Inserts a Mermaid diagram block template
+          insertAtCursor(document.getElementById("blockText"), "\n```mermaid\ngraph TD;\n    A-->B;\n```\n");
+      });
+      $("#blockTextToolbar .toggle-preview").click(function() {
+          let textarea = $("#blockText");
+          let previewDiv = $("#blockTextPreview");
+          if (previewDiv.is(":visible")) {
+              previewDiv.hide();
+          } else {
+              let content = textarea.val();
+              // Use Marked.js to convert Markdown to HTML
+              previewDiv.html(renderMarkdown(content));
+              renderMermaidIn("#blockTextPreview .mermaid");
+              previewDiv.show();
+          }
+      });
+
+      // Paragraph Editor Toolbar (delegated event handlers for dynamically added editors)
+      $("#paragraphContainer").on("click", ".insert-bold", function(){
+          let textarea = $(this).closest('.paragraph-editor').find("textarea")[0];
+          insertAtCursor(textarea, "**bold text**");
+      });
+      $("#paragraphContainer").on("click", ".insert-italic", function(){
+          let textarea = $(this).closest('.paragraph-editor').find("textarea")[0];
+          insertAtCursor(textarea, "*italic text*");
+      });
+      $("#paragraphContainer").on("click", ".insert-equation", function(){
+          let textarea = $(this).closest('.paragraph-editor').find("textarea")[0];
+          insertAtCursor(textarea, "\n$$\n equation \n$$\n");
+      });
+      $("#paragraphContainer").on("click", ".insert-mermaid", function(){
+          let textarea = $(this).closest('.paragraph-editor').find("textarea")[0];
+          insertAtCursor(textarea, "\n```mermaid\ngraph TD;\n    A-->B;\n```\n");
+      });
+      $("#paragraphContainer").on("click", ".toggle-preview", function(){
+          let container = $(this).closest('.paragraph-editor');
+          let textarea = container.find("textarea");
+          let previewDiv = container.find(".preview");
+          if (previewDiv.is(":visible")) {
+              previewDiv.hide();
+          } else {
+              console.log("Previewing:", textarea.val());
+              previewDiv.html(renderMarkdown(textarea.val()));
+              renderMermaidIn("#paragraphTextPreview .mermaid");
+              previewDiv.show();
+          }
+      });
+    });
+
 
   </script>
 
