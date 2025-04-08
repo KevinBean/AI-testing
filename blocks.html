@@ -10,6 +10,13 @@
   <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
   <!-- Marked.js for Markdown rendering -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({ startOnLoad: false });
+  </script>
+
+
   <style>
     /* Checked above - CSS */
     body { padding: 20px; }
@@ -1093,7 +1100,7 @@
     function getHighlightedSearchContext(fullText, searchTerm, contextSize = 50) {
       // If no search term or it's empty, return the original rendered text
       if (!searchTerm || searchTerm.trim() === "") {
-        return marked.parse(fullText);
+        return renderMarkdown(fullText);
       }
       
       // Create a context window around the matched term
@@ -1116,11 +1123,11 @@
         const highlightedText = extractedText.replace(highlightRegex, '<mark>$1</mark>');
         
         // Render only the extracted part with highlight
-        return marked.parse(highlightedText);
+        return renderMarkdown(highlightedText);
       }
       
       // If no match found, return the original rendered text
-      return marked.parse(fullText);
+      return renderMarkdown(fullText);
     }
 
     /**********************
@@ -1285,7 +1292,7 @@
 
     // Enhanced function to show block details with referencing paragraphs
     function showBlockDetails(block) {
-      let renderedText = marked.parse(block.text);
+      let renderedText = renderMarkdown(block.text);
       const title = block.title || "Block " + block.id;
       
       let html = `
@@ -1321,6 +1328,9 @@
       
       // Insert the HTML into a modal or container
       $("#blockDetailView").html(html).show();
+
+       // ✅ Now that it’s in the DOM, render Mermaid
+       renderMermaidIn("#blockDetailView .mermaid"); // ✅ call here
       
       // Set up close button handler
       $(".delete-block-btn").on("click", function(e) {
@@ -1350,7 +1360,7 @@
                 <div>
                   <strong>Document:</strong> ${ref.docTitle} 
                   <br><strong>Paragraph:</strong> ${ref.paraIndex + 1}
-                  <br>${marked.parse(ref.content)}
+                  <br>${renderMarkdown(ref.content)}
                 </div>
                 <button class="btn btn-sm btn-outline-primary view-document-btn" 
                         data-doc-id="${ref.docId}" data-para-index="${ref.paraIndex}">
@@ -1363,6 +1373,7 @@
         listHtml += '</ul>';
         
         refList.html(listHtml);
+        renderMermaidIn("#referencingParagraphsList .mermaid");
         
         // Add click handler for view buttons
         $(".view-document-btn").click(function() {
@@ -1610,7 +1621,7 @@
                 if(block.refLevels && block.refLevels.length > 0) {
                   html += "<strong>" + block.refLevels.join(".") + "</strong>";
                 }
-                html += ": <strong>" + (block.title || "Block " + block.id) + "</strong> - " + marked.parse(block.text);
+                html += ": <strong>" + (block.title || "Block " + block.id) + "</strong> - " + renderMarkdown(block.text);
                 // Add tags if available
                 if(block.tags && block.tags.length) {
                   html += " <span class='badge badge-info'>" + block.tags.join("</span> <span class='badge badge-info'>") + "</span>";
@@ -1628,6 +1639,7 @@
             }
             html += "</div></div>";
             $("#referenceCombinedView").html(html);
+            renderMermaidIn("#referenceCombinedView .mermaid");
 
             // Add event handler after HTML is inserted
             $(".edit-ref-block-btn").on("click", function() {
@@ -1803,7 +1815,7 @@
               <div class="block-preview-container-${block.id} mt-2">
                 <div class="card">
                   <div class="card-body bg-light">
-                    ${marked.parse(block.text)}
+                    ${renderMarkdown(block.text)}
                     ${block.tags && block.tags.length ? 
                       `<div class="mt-2">${block.tags.map(t => `<span class="badge badge-info mr-1">${t}</span>`).join('')}</div>` : ''}
                   </div>
@@ -1821,6 +1833,7 @@
       
       html += '</div></div></div>';
       $("#documentReferencesList").html(html);
+      renderMermaidIn("#documentReferencesList .mermaid");
       
       // Add event listeners to reference view buttons
       $(".view-reference-btn").on("click", function() {
@@ -2015,7 +2028,7 @@
           fetchBlockById(parseInt(blockId), function(block) {
             if(block) {
               const previewHtml = `<div class="alert alert-info">
-                <strong>Block ${blockId}: ${block.title || ''}</strong> ${marked.parse(block.text)}
+                <strong>Block ${blockId}: ${block.title || ''}</strong> ${renderMarkdown(block.text)}
                 ${block.reference ? `<div><strong>Reference:</strong> ${block.reference} 
                 ${block.refLevels && block.refLevels.length > 0 ? block.refLevels.join(".") : ""}</div>` : '' }
                 ${block.tags && block.tags.length ? `<div><strong>Tags:</strong> ${block.tags.join(", ")}</div>` : '' }
@@ -2097,7 +2110,7 @@
           fetchBlockById(parseInt(blockId), function(block) {
             if(block) {
               const previewHtml = `<div class="alert alert-info">
-                <strong>Block ${blockId}: ${block.title || ''}</strong> ${marked.parse(block.text)}
+                <strong>Block ${blockId}: ${block.title || ''}</strong> ${renderMarkdown(block.text)}
                 ${block.reference ? `<div><strong>Reference:</strong> ${block.reference} 
                 ${block.refLevels && block.refLevels.length > 0 ? block.refLevels.join(".") : ""}</div>` : '' }
                 ${block.tags && block.tags.length ? `<div><strong>Tags:</strong> ${block.tags.join(", ")}</div>` : '' }
@@ -2168,7 +2181,7 @@
         
         // Start building the paragraph HTML
         const paraTitleHTML = paraTitle ? `<h4>${paraTitle} (Paragraph ${i+1})</h4>` : `<h4>Paragraph ${i+1}</h4>`;
-        let paragraphHTML = `<div class="mb-3">${marked.parse(content)}`;
+        let paragraphHTML = `<div class="mb-3">${renderMarkdown(content)}`;
         
         // Display paragraph tags if present
         if(tags.length) {
@@ -2190,7 +2203,7 @@
             
             fetchBlockById(blockRef, function(block) {
               if(block) {
-                blockHTML += `<p class="text-info"><strong>${block.title || 'Block ' + block.id}:</strong> ${marked.parse(block.text)}` +
+                blockHTML += `<p class="text-info"><strong>${block.title || 'Block ' + block.id}:</strong> ${renderMarkdown(block.text)}` +
                   (block.reference ? ` <span class="block-reference">[Reference: ${block.reference}` +
                   (block.refLevels && block.refLevels.length > 0 ? " " + block.refLevels.join(".") : "") + `]</span>` : "") + 
                   (block.tags && block.tags.length ? ` <small>[Tags: ${block.tags.join(", ")}]</small>` : "") +
@@ -2234,6 +2247,7 @@
         // Filter out any undefined entries and join the previews
         const filteredPreviews = paragraphPreviews.filter(p => p !== undefined);
         $("#docPreviewContent").html(previewHTML + filteredPreviews.join(''));
+        renderMermaidIn("#docPreviewContent .mermaid");
       }
     });
 
@@ -2375,7 +2389,7 @@
         // Add paragraph title if available
         const paragraphTitle = p.title ? `<h5 class="mb-2">${p.title}</h5>` : `<strong>Paragraph ${i+1}</strong>`;
     
-        html += `<div class="card-body"><div class="paragraph-header">${paragraphTitle}</div>${marked.parse(p.content)}`;
+        html += `<div class="card-body"><div class="paragraph-header">${paragraphTitle}</div>${renderMarkdown(p.content)}`;
 
         
         // Display paragraph tags if present
@@ -2386,7 +2400,7 @@
         if(p.blockRef) {
           html += `<p><em>Block Reference: ${p.blockRef}</em></p>`;
           fetchBlockById(p.blockRef, function(block) {
-            html += block ? `<p class="text-info"><strong>${block.title || 'Block ' + block.id}:</strong> ${marked.parse(block.text)}` +
+            html += block ? `<p class="text-info"><strong>${block.title || 'Block ' + block.id}:</strong> ${renderMarkdown(block.text)}` +
               (block.reference ? ` <span class="block-reference">[Reference: ${block.reference}` +
               (block.refLevels && block.refLevels.length > 0 ? " " + block.refLevels.join(".") : "") + `]</span>` : "") + 
               (block.tags && block.tags.length ? ` <small>[Tags: ${block.tags.join(", ")}]</small>` : "") +
@@ -2404,6 +2418,7 @@
         html += "</div>";
       });
       $("#docPreviewContent").html(html);
+      renderMermaidIn("#docPreviewContent .mermaid");
 
       // Set up close button handler
       $(".delete-doc-btn").on("click", function(e) {
@@ -2583,7 +2598,7 @@
             fetchBlockById(parseInt(blockId), function(block) {
               if(block) {
                 const previewHtml = `<div class="alert alert-info">
-                  <strong>Block ${blockId}: ${block.title || ''}</strong> ${marked.parse(block.text)}
+                  <strong>Block ${blockId}: ${block.title || ''}</strong> ${renderMarkdown(block.text)}
                   ${block.reference ? `<div><strong>Reference:</strong> ${block.reference} 
                   ${block.refLevels && block.refLevels.length > 0 ? block.refLevels.join(".") : ""}</div>` : '' }
                   ${block.tags && block.tags.length ? `<div><strong>Tags:</strong> ${block.tags.join(", ")}</div>` : '' }
@@ -2668,7 +2683,7 @@
             fetchBlockById(parseInt(blockId), function(block) {
               if(block) {
                 const previewHtml = `<div class="alert alert-info">
-                  <strong>Block ${blockId}: ${block.title || ''}</strong> ${marked.parse(block.text)}
+                  <strong>Block ${blockId}: ${block.title || ''}</strong> ${renderMarkdown(block.text)}
                   ${block.reference ? `<div><strong>Reference:</strong> ${block.reference} 
                   ${block.refLevels && block.refLevels.length > 0 ? block.refLevels.join(".") : ""}</div>` : '' }
                   ${block.tags && block.tags.length ? `<div><strong>Tags:</strong> ${block.tags.join(", ")}</div>` : '' }
@@ -3009,7 +3024,7 @@
         if (cursor) {
           const block = cursor.value;
           if (block.tags && block.tags.includes(tag)) {
-            let renderedText = marked.parse(block.text);
+            let renderedText = renderMarkdown(block.text);
             const blockItem = $(`
               <div class="card mb-2">
                 <div class="card-body">
@@ -3816,7 +3831,7 @@
             <div class="card">
               <div class="card-header">Result</div>
               <div class="card-body">
-                <div class="bg-light p-3 border rounded result-content">${marked.parse(response)}</div>
+                <div class="bg-light p-3 border rounded result-content">${renderMarkdown(response)}</div>
                 <div class="mt-3">
                   <button class="btn btn-sm btn-outline-primary copy-result-btn">
                     <i class="fas fa-copy"></i> Copy Results
@@ -3909,6 +3924,9 @@
         if (action.enablewebsearch) {
           delete payload.temperature;
         }
+
+        //show payload in console for debugging
+        console.log("OpenAI API Payload:", payload);
         
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -5401,7 +5419,7 @@
               </div>
             </div>
             <div class="card-body step-result-content">
-              <div class="bg-light p-2 border rounded result-content">${marked.parse(result)}</div>
+              <div class="bg-light p-2 border rounded result-content">${renderMarkdown(result)}</div>
             </div>
           </div>
         `);
@@ -5456,18 +5474,19 @@
         html += `<div class="mb-3">
           <h6>Step ${result.step}: ${result.name}</h6>
           <p>Status: <span class="badge badge-${result.status === 'success' ? 'success' : 'danger'}">${result.status}</span></p>
-          ${result.result ? `<div class="bg-light p-2 border rounded">${marked.parse(result.result)}</div>` : ''}
+          ${result.result ? `<div class="bg-light p-2 border rounded">${renderMarkdown(result.result)}</div>` : ''}
           ${result.message ? `<p class="text-danger">${result.message}</p>` : ''}
         </div>`;
       });
       
       html += `<div class="mt-3">
         <h5>Final Result:</h5>
-        <div class="bg-light p-2 border rounded">${marked.parse(finalResult)}</div>
+        <div class="bg-light p-2 border rounded">${renderMarkdown(finalResult)}</div>
       </div>`;
       
       html += '</div></div>';
       $("#workflowResultContainer").html(html);
+      renderMermaidIn("#workflowResultContainer .mermaid");
     }
 
     function saveWorkflowConfiguration(workflow) {
@@ -6019,5 +6038,98 @@
       loadCollections();
     });
   </script>
+  <script>
+    // Load Mermaid and KaTeX properly
+    function loadMermaidAndKatex() {
+        // Mermaid
+        const mermaidScript = document.createElement("script");
+        mermaidScript.src = "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js";
+        mermaidScript.onload = () => mermaid.initialize({ startOnLoad: false });
+        document.head.appendChild(mermaidScript);
+
+        // KaTeX CSS
+        const katexCSS = document.createElement("link");
+        katexCSS.rel = "stylesheet";
+        katexCSS.href = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css";
+        document.head.appendChild(katexCSS);
+
+        // Load KaTeX first
+        const katexScript = document.createElement("script");
+        katexScript.src = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js";
+        katexScript.onload = () => {
+          // Load auto-render AFTER katex is available
+          const autoRender = document.createElement("script");
+          autoRender.src = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js";
+          autoRender.onload = () => {
+            console.log("KaTeX auto-render loaded.");
+          };
+          document.head.appendChild(autoRender);
+        };
+        document.head.appendChild(katexScript);
+      }
+
+      loadMermaidAndKatex();
+
+  </script>
+
+  <script>
+    function renderMarkdown(text) {
+      const html = marked.parse(text);
+      const container = document.createElement("div");
+      container.innerHTML = html;
+
+      // Replace ```mermaid blocks with <div class="mermaid">
+      container.querySelectorAll("code.language-mermaid").forEach(code => {
+        const div = document.createElement("div");
+        div.className = "mermaid";
+        div.textContent = code.textContent;
+        code.parentElement.replaceWith(div);
+      });
+
+      // Render KaTeX
+      if (typeof renderMathInElement === "function") {
+        try {
+          renderMathInElement(container, {
+            delimiters: [
+              { left: "$$", right: "$$", display: true },
+              { left: "$", right: "$", display: false }
+            ]
+          });
+        } catch (e) {
+          console.warn("KaTeX rendering failed:", e);
+        }
+      }
+
+      // 🔥 Render Mermaid after container is injected
+      setTimeout(() => {
+        if (typeof mermaid !== "undefined") {
+          const blocks = container.querySelectorAll(".mermaid");
+          if (blocks.length > 0) {
+            mermaid.init(undefined, blocks);
+          }
+        }
+      }, 100);
+
+      return container.innerHTML;
+    }
+
+    function renderMermaidIn(selector) {
+      if (typeof mermaid === "undefined") return;
+
+      const blocks = document.querySelectorAll(selector);
+      if (!blocks.length) return;
+
+      // Defer rendering to avoid layout issues
+      setTimeout(() => {
+        try {
+          mermaid.init(undefined, blocks);
+        } catch (e) {
+          console.warn("Mermaid rendering error:", e);
+        }
+      }, 100);
+    }
+
+  </script>
+
 </body>
 </html>
