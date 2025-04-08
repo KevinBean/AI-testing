@@ -433,9 +433,10 @@
                 <small class="form-text text-muted">Click on a tag to see all content with that tag</small>
               </div>
             </div>
+
+            <div id="tagTreeContainer" class="mb-4"></div>
             <div class="section-title">Popular Tags</div>
             <div id="tagCloud" class="mb-4"></div>
-            <div id="tagTreeContainer" class="mb-4"></div>
           </div>
           <div class="col-md-9">
             <div class="row-md-4">
@@ -481,111 +482,111 @@
         <div class="row">
           <div class="col-md-3">
             <div class="mb-2">
+              <button id="addActionBtn" class="btn btn-primary btn-block mt-3">Add New Action</button>
+            </div>
+            <div class="mb-2">
 <input type="text" id="actionSearch" class="form-control" placeholder="Search actions...">
               <small class="form-text text-muted">Search by title, description, or tags</small>
             </div>
             <div class="section-title">Saved Actions <small>(Click to edit)</small></div>
             <ul id="actionsList" class="list-group mb-3"></ul>
           </div>
-          <div class="col-md-5 preview-col">
-            <div class="card mb-4">
-              <div class="card-header">Action Preview</div>
-              <div class="card-body">
-                <div id="actionPreview" class="border p-3">
-                  <p class="text-muted">Select an action to preview its settings and prompt template.</p>
+          <div class="col-md-9">
+            <div class="row-md-5">
+              <div id="actionPreview" class="card">
+                <p class="text-muted">Select an action to preview its settings and prompt template.</p>
+              </div>
+              <div class="card">
+                <div class="card-header">Action Testing</div>
+                <div class="card-body">
+                  <div class="form-group">
+                    <label for="actionTestInput">Input Content</label>
+                    <textarea id="actionTestInput" class="form-control" rows="4" placeholder="Enter content for the action to process..."></textarea>
+                  </div>
+                  <button id="runActionBtn" class="btn btn-primary" disabled>Select Content & Run Action</button>
+                  <div id="actionResultContainer" class="mt-3">
+                    <div class="alert alert-info">Results will appear here after running the action.</div>
+                  </div>
                 </div>
               </div>
             </div>
-            <div class="card">
-              <div class="card-header">Action Testing</div>
-              <div class="card-body">
-                <div class="form-group">
-                  <label for="actionTestInput">Input Content</label>
-                  <textarea id="actionTestInput" class="form-control" rows="4" placeholder="Enter content for the action to process..."></textarea>
-                </div>
-                <button id="runActionBtn" class="btn btn-primary" disabled>Select Content & Run Action</button>
-                <div id="actionResultContainer" class="mt-3">
-                  <div class="alert alert-info">Results will appear here after running the action.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-4 editor-col">
-            <div class="card mb-4">
-              <div class="card-header">Action Configuration</div>
-              <div class="card-body">
-                <div class="help-tip mb-3">
-                    <p><strong>What are Actions?</strong> Actions are AI-powered operations you can configure to process your content. Create custom prompts with specific models and settings. Learn more about available models <a href="https://platform.openai.com/docs/models" target="_blank">here</a>.</p>
-                </div>
-                <form id="actionForm">
-                  <div class="form-group">
-                    <label for="actionTitle" class="required-field">Title</label>
-                    <input type="text" id="actionTitle" class="form-control" placeholder="Action name" required>
+            <div class="row-md-4">
+              <div class="card mb-4">
+                <div class="card-header">Action Configuration</div>
+                <div class="card-body">
+                  <div class="help-tip mb-3">
+                      <p><strong>What are Actions?</strong> Actions are AI-powered operations you can configure to process your content. Create custom prompts with specific models and settings. Learn more about available models <a href="https://platform.openai.com/docs/models" target="_blank">here</a>.</p>
                   </div>
-                  <div class="form-group">
-                    <label for="actionDescription" class="required-field">Description (System Prompt)</label>
-                    <textarea id="actionDescription" class="form-control" rows="2" placeholder="How should this action perform?" required></textarea>
-                  </div>
-                  <div class="form-group">
-                    <label for="actionTags">Tags</label>
-                    <input type="text" id="actionTags" class="form-control" placeholder="comma, separated, tags">
-                  </div>
-                  <div class="form-row">
-                    <div class="form-group col-md-6">
-                      <label for="actionModel" class="required-field">AI Model</label>
-                      <input type="text" id="actionModel" class="form-control" list="modelOptions" placeholder="Enter or select model" required>
-                      <datalist id="modelOptions">
-                        <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                        <option value="gpt-4">GPT-4</option>
-                        <option value="gpt-4o">GPT-4o</option>
-                        <option value="gpt-4o-search-preview">GPT-4o Search Preview</option>
-                      </datalist>
+                  <form id="actionForm">
+                    <div class="form-group">
+                      <label for="actionTitle" class="required-field">Title</label>
+                      <input type="text" id="actionTitle" class="form-control" placeholder="Action name" required>
                     </div>
-                    <div class="form-group col-md-6">
-                      <label for="actionPurpose">Purpose</label>
-                      <select id="actionPurpose" class="form-control">
-                        <option value="generate">Generate Content</option>
-                        <option value="modify">Modify Content</option>
-                        <option value="analyze">Analyze Content</option>
-                        <option value="synthesize">Synthesize Content</option>
-                      </select>
+                    <div class="form-group">
+                      <label for="actionDescription" class="required-field">Description (System Prompt)</label>
+                      <textarea id="actionDescription" class="form-control" rows="2" placeholder="How should this action perform?" required></textarea>
                     </div>
-                  </div>
-                  <div class="form-group form-check">
-                    <input type="checkbox" class="form-check-input" id="enableWebSearch">
-                    <label class="form-check-label" for="enableWebSearch">Enable Web Search (if supported by model)</label>
-                  </div>
-
-                  <div class="form-group form-check">
-                    <input type="checkbox" class="form-check-input" id="useTools">
-                    <label class="form-check-label" for="useTools">Use Tools (functions Not Working Now)</label>
-                  </div>
-
-                  <div class="form-group" id="toolsDefinitionContainer" style="display:none;">
-                    <label for="toolsDefinition">Tools Definition (JSON)</label>
-                    <textarea id="toolsDefinition" class="form-control" rows="6" placeholder='Enter tool definitions JSON here'></textarea>
-                    <small class="form-text text-muted">Define tools as JSON objects. Example provided in documentation.</small>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="actionTemperature">Temperature: <span id="tempValue">0.7</span></label>
-                    <input type="range" class="form-control-range" id="actionTemperature" min="0" max="1" step="0.1" value="0.7">
-                    <small class="form-text text-muted">
-                      Lower values (0-0.3): More focused, deterministic outputs<br>
-                      Medium values (0.4-0.7): Balanced creativity<br>
-                      Higher values (0.8-1.0): More random, creative outputs
-                    </small>
-                  </div>
-                  <div class="form-group">
-                    <label for="actionPrompt" class="required-field">Prompt Template</label>
-                    <div class="help-tip mb-2">
-                      <p>Use <code>{content}</code> as placeholder for the input content</p>
+                    <div class="form-group">
+                      <label for="actionTags">Tags</label>
+                      <input type="text" id="actionTags" class="form-control" placeholder="comma, separated, tags">
                     </div>
-                    <textarea id="actionPrompt" class="form-control" rows="6" placeholder="Write your prompt here. Use {content} where the input should go." required></textarea>
-                  </div>
-                  <button type="submit" id="saveActionBtn" class="btn btn-primary">Save Action</button>
-                  <button type="button" id="cancelActionBtn" class="btn btn-secondary">Clear</button>
-                </form>
+                    <div class="form-row">
+                      <div class="form-group col-md-6">
+                        <label for="actionModel" class="required-field">AI Model</label>
+                        <input type="text" id="actionModel" class="form-control" list="modelOptions" placeholder="Enter or select model" required>
+                        <datalist id="modelOptions">
+                          <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                          <option value="gpt-4">GPT-4</option>
+                          <option value="gpt-4o">GPT-4o</option>
+                          <option value="gpt-4o-search-preview">GPT-4o Search Preview</option>
+                        </datalist>
+                      </div>
+                      <div class="form-group col-md-6">
+                        <label for="actionPurpose">Purpose</label>
+                        <select id="actionPurpose" class="form-control">
+                          <option value="generate">Generate Content</option>
+                          <option value="modify">Modify Content</option>
+                          <option value="analyze">Analyze Content</option>
+                          <option value="synthesize">Synthesize Content</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="form-group form-check">
+                      <input type="checkbox" class="form-check-input" id="enableWebSearch">
+                      <label class="form-check-label" for="enableWebSearch">Enable Web Search (if supported by model)</label>
+                    </div>
+
+                    <div class="form-group form-check">
+                      <input type="checkbox" class="form-check-input" id="useTools">
+                      <label class="form-check-label" for="useTools">Use Tools (functions Not Working Now)</label>
+                    </div>
+
+                    <div class="form-group" id="toolsDefinitionContainer" style="display:none;">
+                      <label for="toolsDefinition">Tools Definition (JSON)</label>
+                      <textarea id="toolsDefinition" class="form-control" rows="6" placeholder='Enter tool definitions JSON here'></textarea>
+                      <small class="form-text text-muted">Define tools as JSON objects. Example provided in documentation.</small>
+                    </div>
+
+                    <div class="form-group">
+                      <label for="actionTemperature">Temperature: <span id="tempValue">0.7</span></label>
+                      <input type="range" class="form-control-range" id="actionTemperature" min="0" max="1" step="0.1" value="0.7">
+                      <small class="form-text text-muted">
+                        Lower values (0-0.3): More focused, deterministic outputs<br>
+                        Medium values (0.4-0.7): Balanced creativity<br>
+                        Higher values (0.8-1.0): More random, creative outputs
+                      </small>
+                    </div>
+                    <div class="form-group">
+                      <label for="actionPrompt" class="required-field">Prompt Template</label>
+                      <div class="help-tip mb-2">
+                        <p>Use <code>{content}</code> as placeholder for the input content</p>
+                      </div>
+                      <textarea id="actionPrompt" class="form-control" rows="6" placeholder="Write your prompt here. Use {content} where the input should go." required></textarea>
+                    </div>
+                    <button type="submit" id="saveActionBtn" class="btn btn-primary">Save Action</button>
+                    <button type="button" id="cancelActionBtn" class="btn btn-secondary">Clear</button>
+                  </form>
+                </div>
               </div>
             </div>
           </div>
@@ -3109,24 +3110,6 @@
               .addClass("list-group-item list-item")
               .html(`<strong>${action.title}</strong><br><small>${action.description || ""}</small>`)
               .click(function() { previewAction(action); });
-              
-            const editBtn = $("<button>")
-              .addClass("btn btn-sm btn-warning action-btn")
-              .text("Edit")
-              .click(function(e) { 
-                e.stopPropagation(); 
-                editAction(action); 
-              });
-              
-            const delBtn = $("<button>")
-              .addClass("btn btn-sm btn-danger action-btn")
-              .text("Delete")
-              .click(function(e) { 
-                e.stopPropagation(); 
-                deleteAction(action.id); 
-              });
-              
-            li.append(editBtn, delBtn);
             
             if (action.tags && action.tags.length) {
               const tagsSpan = $("<div>")
@@ -3147,46 +3130,71 @@
       loadActions(searchTerm);
     });
 
+    $("#addActionBtn").on("click", function() {
+      $("#actionForm")[0].reset();
+      editingActionId = null;
+      $("#actionForm button[type=submit]").text("Add Action");
+      $("#actionForm").show();
+      $("#actionTitle").focus();
+    });
+
     function previewAction(action) {
       let html = `
-        <h5>${action.title}</h5>
-        <p>${action.description || "<em>No description</em>"}</p>
-        
-        <div class="row mb-3">
-          <div class="col-md-4">
-            <strong>AI Model:</strong><br>
-            ${action.model || "gpt-3.5-turbo"}
-          </div>
-          <div class="col-md-4">
-            <strong>Purpose:</strong><br>
-            ${action.purpose || "generate"}
-          </div>
-          <div class="col-md-4">
-            <strong>Web Search:</strong><br>
-            ${action.enablewebsearch ? "Enabled" : "Disabled"}
-          </div>
-          <div class="col-md-4">
-            <strong>Temperature:</strong><br>
-            ${action.temperature || "0.7"}
+        <div class="card-header">${action.title}
+          <div class="btn-group float-right">
+            <button class="btn btn-sm btn-warning action-btn" id="editActionBtn">Edit</button>
+            <button class="btn btn-sm btn-danger action-btn" id="deleteActionBtn">Delete</button>
           </div>
         </div>
-        
-        <div class="mb-3">
-          <strong>Tags:</strong><br>
-          ${action.tags && action.tags.length ? 
-            action.tags.map(t => `<span class="badge badge-info mr-1">${t}</span>`).join("") : 
-            "<em>No tags</em>"}
-        </div>
-        
-        <div>
-          <strong>Prompt Template:</strong>
-          <pre class="bg-light p-2 border rounded">${action.prompt}</pre>
+        <div class="card-body">
+          <p>${action.description || "<em>No description</em>"}</p>
+          
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <strong>AI Model:</strong><br>
+              ${action.model || "gpt-3.5-turbo"}
+            </div>
+            <div class="col-md-4">
+              <strong>Purpose:</strong><br>
+              ${action.purpose || "generate"}
+            </div>
+            <div class="col-md-4">
+              <strong>Web Search:</strong><br>
+              ${action.enablewebsearch ? "Enabled" : "Disabled"}
+            </div>
+            <div class="col-md-4">
+              <strong>Temperature:</strong><br>
+              ${action.temperature || "0.7"}
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <strong>Tags:</strong><br>
+            ${action.tags && action.tags.length ? 
+              action.tags.map(t => `<span class="badge badge-info mr-1">${t}</span>`).join("") : 
+              "<em>No tags</em>"}
+          </div>
+          
+          <div>
+            <strong>Prompt Template:</strong>
+            <pre class="bg-light p-2 border rounded">${action.prompt}</pre>
+          </div>
         </div>
       `;
       
       $("#actionPreview").html(html);
       $("#runActionBtn").prop("disabled", false);
       $("#runActionBtn").data("action-id", action.id);
+      //edit and delete buttons
+      $("#editActionBtn").off("click").on("click", function(e) {
+        e.stopPropagation();
+        editAction(action);
+      });
+
+      $("#deleteActionBtn").off("click").on("click", function(e) {
+        e.stopPropagation();
+        deleteAction(action.id);
+      });
     }
 
     function editAction(action) {
@@ -3205,6 +3213,9 @@
 
       $("#actionPrompt").val(action.prompt);
       $("#saveActionBtn").text("Update Action");
+      // focus on the title field
+      $("#actionForm").show();
+      $("#actionTitle").focus();
     }
 
     function deleteAction(id) {
