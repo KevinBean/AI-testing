@@ -515,8 +515,8 @@
                     <input type="text" id="actionTitle" class="form-control" placeholder="Action name" required>
                   </div>
                   <div class="form-group">
-                    <label for="actionDescription">Description</label>
-                    <textarea id="actionDescription" class="form-control" rows="2" placeholder="What does this action do?"></textarea>
+                    <label for="actionDescription" class="required-field">Description (System Prompt)</label>
+                    <textarea id="actionDescription" class="form-control" rows="2" placeholder="How should this action perform?" required></textarea>
                   </div>
                   <div class="form-group">
                     <label for="actionTags">Tags</label>
@@ -3668,11 +3668,9 @@
         }
       }
       
-      if (contentParts.length === 0) {
-        const inputContent = $("#actionTestInput").val().trim();
-        if (inputContent) {
-          contentParts.push(inputContent);
-        }
+      const inputContent = $("#actionTestInput").val().trim();
+      if (inputContent) {
+        contentParts.push(inputContent);
       }
       
       return contentParts.join("\n\n---\n\n");
@@ -3688,8 +3686,6 @@
           $("#actionResultContainer").html('<div class="alert alert-danger">Action not found</div>');
           return;
         }
-
-        content = content + "\n\n---\n\n" + $("#actionTestInput").val().trim();
         
         const contentPreview = $(`
           <div class="card mb-3">
@@ -3736,7 +3732,7 @@
         $("#actionResultContainer").append(contentPreview);
         $("#actionResultContainer").append('<div class="text-center my-3"><i class="fas fa-spinner fa-spin"></i> Processing your request...</div>');
         
-        callOpenAiApi(processedPrompt, action, content).then(response => {
+        callOpenAiApi(action, processedPrompt).then(response => {
           $("#actionResultContainer").find('.text-center').remove();
           $("#actionResultContainer").append(`
             <div class="card">
@@ -3806,13 +3802,13 @@
       showNotification("Results added as a new paragraph!", "success");
     }
 
-    async function callOpenAiApi(prompt, action, content) {
+    async function callOpenAiApi(action, prompt) {
       try {
         const payload = {
           model: action.model || "gpt-3.5-turbo",
           messages: [
-            { role: "system", content: prompt },
-            { role: "user", content: content }
+            { role: "system", content: action.description || "You are a helpful assistant." },
+            { role: "user", content: prompt }
           ],
           temperature: parseFloat(action.temperature) || 0.7,
           max_tokens: 800
@@ -4814,7 +4810,7 @@
             
             const processedPrompt = action.prompt.replace(/{content}/g, finalInput || "");
             
-            const result = await callOpenAiApi(processedPrompt, action, combinedInput);
+            const result = await callOpenAiApi(action, processedPrompt);
             
             currentContent = result;
             
@@ -5307,7 +5303,7 @@
         
         const processedPrompt = action.prompt.replace(/{content}/g, inputContent || "");
         
-        const result = await callOpenAiApi(processedPrompt, action, inputContent);
+        const result = await callOpenAiApi(action, processedPrompt);
         
         stepContainer.find('.step-status')
           .html('<span class="badge badge-success">Success</span>');
