@@ -1782,6 +1782,29 @@ graph TD;
                 Block:
                 <pre><code>$$
 \int_0^\infty x^2 dx = \frac{1}{3}x^3\Big|_0^\infty
+```
+</pre>
+              </li>
+            </ul>
+
+            <h5>AI-Generated Calculations</h5>
+            <p>
+              This system can generate calculations that can include select-type
+              parameters with options. When the AI-generated calculation is
+              applied, it creates parameter rows for each parameter. However,
+              while the <code>addParameterRow()</code> function handles
+              displaying the param type "select", it doesn't correctly handle
+              the "options" property for select-type parameters. The
+              <code>param-options</code> div is shown/hidden based on parameter
+              type, but the options aren't automatically populated from the AI
+              response.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
 $$</code></pre>
               </li>
             </ul>
@@ -2670,7 +2693,7 @@ $$</code></pre>
         // Insert the HTML into a modal or container
         $("#blockDetailView").html(html).show();
 
-        // ✅ Now that it’s in the DOM, render Mermaid
+        // ✅ Now that it's in the DOM, render Mermaid
         renderMermaidIn("#blockDetailView .mermaid"); // ✅ call here
 
         // Set up close button handler
@@ -4957,10 +4980,10 @@ $$</code></pre>
               </div>
             </div>
           </div>
-          <div class="param-options d-none mt-1">
+          <div class="param-options ${param?.type === 'select' ? '' : 'd-none'} mt-1">
             <label class="small mb-1">Options (comma separated)</label>
             <input type="text" class="form-control" placeholder="Options (comma separated)"
-                  value="${param?.options || ""}">
+                  value="${param?.options ? (Array.isArray(param.options) ? param.options.join(', ') : param.options) : ''}">
           </div>
         </div>
       </div>
@@ -4975,6 +4998,8 @@ $$</code></pre>
 
         // Re-initialize drag and drop
         setTimeout(initializeParamDragAndDrop, 50);
+
+        return newParam;
       }
 
       function addParameterGroup() {
@@ -5716,194 +5741,314 @@ $$</code></pre>
 
       // Function to perform the calculation
       function performCalculation(calculation, formId, resultId) {
-        const form = $(`#${formId}`);
-        const resultContainer = $(`#${resultId}`);
-        const params = {};
+  const form = $(`#${formId}`);
+  const resultContainer = $(`#${resultId}`);
+  const params = {};
 
-        // Collect initial parameter values from the form
-        form.find(".calc-param").each(function () {
-          const name = $(this).attr("name");
-          const type = $(this).data("param-type");
-          let value = $(this).val();
+  // Collect initial parameter values from the form
+  form.find(".calc-param").each(function () {
+    const name = $(this).attr("name");
+    const type = $(this).data("param-type");
+    let value = $(this).val();
 
-          // Convert value based on type
-          if (type === "number") {
-            value = parseFloat(value) || 0;
-          } else if (type === "boolean") {
-            value = $(this).is(":checked");
-          }
+    // Convert value based on type
+    if (type === "number") {
+      value = parseFloat(value) || 0;
+    } else if (type === "boolean") {
+      value = $(this).is(":checked");
+    }
 
-          params[name] = value;
-        });
+    params[name] = value;
+  });
 
+  try {
+    // Add tables as a property to params if they exist
+    // This is a crucial step - we need to either extract tables from the equation or add them directly
+    if (calculation.tables) {
+      params.tables = calculation.tables;
+    } else if (calculation.calculationType === "simple" && calculation.equation) {
+      // Extract tables from equation if they're declared there
+      const tableMatch = calculation.equation.match(/tables\s*=\s*({[\s\S]*?});/);
+      if (tableMatch && tableMatch[1]) {
         try {
-          let result = {};
+          // Try to parse the tables JSON from the equation
+          const extractedTables = new Function(`return ${tableMatch[1]}`)();
+          params.tables = extractedTables;
+        } catch (err) {
+          console.error("Failed to parse tables from equation:", err);
+          params.tables = {}; // Provide empty tables object as fallback
+        }
+      } else {
+        // Ensure tables exists even if not defined
+        params.tables = {};
+      }
+    } else {
+      // Ensure tables exists even if not defined
+      params.tables = {};
+    }
+    
+    // Add lookup function to the params object for simple calculations
+    params.lookup = function(key, table) {
+      if (!table || typeof table !== 'object') {
+        console.error('Lookup table is not valid', table);
+        return 0;
+      }
+      
+      const value = table[key];
+      if (value === undefined) {
+        console.error(`Key "${key}" not found in lookup table`, table);
+        return 0;
+      }
+      return value;
+    };
+    
+    // Add interpolation function for continuous data
+    params.interpolate = function(x, x1, y1, x2, y2) {
+      if (x2 === x1) return y1;
+      return y1 + (x - x1) * (y2 - y1) / (x2 - x1);
+    };
 
-          if (calculation.calculationType === "simple") {
-            // For simple equation, we'll use a multi-pass approach
-            const equation = calculation.equation;
-            const variableNames = Object.keys(params);
+    let result = {};
 
-            // Define a function to calculate a single variable's value
-            const calculateVariable = (varName, equation) => {
-              try {
-                // Create function arguments from parameter names
-                const evalFunction = new Function(
-                  ...variableNames,
-                  `return ${equation};`
-                );
-                // Call the function with current parameter values
-                return evalFunction(
-                  ...variableNames.map((name) => params[name])
-                );
-              } catch (error) {
-                console.error(`Error calculating ${varName}:`, error);
-                return 0;
-              }
-            };
+    if (calculation.calculationType === "simple") {
+      // For simple equation, we'll use a multi-pass approach
+      const equation = calculation.equation;
+      const variableNames = Object.keys(params);
 
-            // Create a steps array to store intermediate calculations
-            const steps = [];
+      // Define a function to calculate a single variable's value
+      const calculateVariable = (varName, equation) => {
+  try {
+    // Remove any comments (anything after //)
+    const cleanEquation = equation.replace(/\/\/.*$/g, '').trim();
+    
+    // If equation is empty after removing comments, return 0
+    if (!cleanEquation) {
+      return 0;
+    }
+    
+    // Create function arguments from parameter names
+    const evalFunction = new Function(
+      ...variableNames,
+      `return ${cleanEquation};`
+    );
+    
+    // Call the function with current parameter values
+    return evalFunction(
+      ...variableNames.map((name) => params[name])
+    );
+  } catch (error) {
+    console.error(`Error calculating ${varName}:`, error);
+    return 0;
+  }
+};
 
-            // If the equation contains multiple variable assignments
-            if (equation.includes(";")) {
-              const statements = equation
-                .split(";")
-                .filter((stmt) => stmt.trim());
-              let lastResult = 0;
+      // Create a steps array to store intermediate calculations
+      const steps = [];
 
-              // Process each statement
-              for (let stmt of statements) {
-                stmt = stmt.trim();
+     // If the equation contains multiple variable assignments
+if (equation.includes(";")) {
+  // Split the equation into statements and filter out empty ones
+  const statements = equation
+    .split(";")
+    .filter((stmt) => stmt.trim());
+  
+  // Create an object to store intermediate values
+  const intermediateValues = {...params};
+  let lastResult = 0;
 
-                // Check if it's an assignment
-                if (stmt.includes("=")) {
-                  const [varName, expression] = stmt
-                    .split("=")
-                    .map((s) => s.trim());
+  // Process each statement in order
+  for (let stmt of statements) {
+    stmt = stmt.trim();
+    
+    // Remove any comments (anything after //)
+    stmt = stmt.replace(/\/\/.*$/g, '').trim();
+    
+    // Skip empty statements after removing comments
+    if (!stmt) continue;
+    
+    // Check if it's an assignment
+// Check if it's an assignment
+if (stmt.includes("=")) {
+  // Split by the first equals sign
+  const equalsIndex = stmt.indexOf("=");
+  let varName = stmt.substring(0, equalsIndex).trim();
+  let expression = stmt.substring(equalsIndex + 1).trim();
+  
+  // Remove any comments from the variable name (very important!)
+  varName = varName.replace(/\/\/.*$/g, '').trim();
+  
+  // Skip if variable name is empty after removing comments
+  if (!varName) continue;
 
-                  // Calculate the variable value
-                  const value = calculateVariable(varName, expression);
-                  params[varName] = value;
+  try {
+        // Create a custom function for this expression with all current values
+        const evalFunction = new Function(
+          ...Object.keys(intermediateValues),
+          `return ${expression};`
+        );
+        
+        // Calculate the value using all intermediate values computed so far
+        const value = evalFunction(
+          ...Object.keys(intermediateValues).map(name => intermediateValues[name])
+        );
+        
+        // Store the result in our intermediate values
+        intermediateValues[varName] = value;
+        
+        // Save the step
+        steps.push({
+          variable: varName,
+          expression: expression,
+          value: value,
+        });
+        
+        // Save the last value as result
+        lastResult = value;
+      } catch (error) {
+        console.error(`Error calculating ${varName}: ${error.message}`, error);
+        console.log("Expression:", expression);
+        console.log("Available variables:", Object.keys(intermediateValues));
+        
+        // Use a default of 0 for failed calculations
+        intermediateValues[varName] = 0;
+        
+        // Save the error step
+        steps.push({
+          variable: varName,
+          expression: expression + " [ERROR: " + error.message + "]",
+          value: 0,
+        });
+      }
+    } else {
+      try {
+    // Clean statement of any comments
+    const cleanStmt = stmt.replace(/\/\/.*$/g, '').trim();
+    
+    // Skip if statement is empty after removing comments
+    if (!cleanStmt) continue;
+    
+    // For non-assignment statements, calculate the expression directly
+    const evalFunction = new Function(
+      ...Object.keys(intermediateValues),
+      `return ${cleanStmt};`
+    );
+    
+    // Calculate using all intermediate values
+    lastResult = evalFunction(
+      ...Object.keys(intermediateValues).map(name => intermediateValues[name])
+    );
+    
+    // Save the step with clean expression
+    steps.push({
+      variable: "result",
+      expression: cleanStmt,
+      value: lastResult,
+    });
+      } catch (error) {
+        console.error(`Error calculating result: ${error.message}`, error);
+        console.log("Expression:", stmt);
+        console.log("Available variables:", Object.keys(intermediateValues));
+        
+        // Use a default of 0 for failed calculations
+        lastResult = 0;
+        
+        // Save the error step
+        steps.push({
+          variable: "result",
+          expression: stmt + " [ERROR: " + error.message + "]",
+          value: 0,
+        });
+      }
+    }
+  }
 
-                  // Save the step
-                  steps.push({
-                    variable: varName,
-                    expression: expression,
-                    value: value,
-                  });
+  // Store the final calculation result
+  result = {
+    result: lastResult,
+    steps: steps,
+    ...intermediateValues, // Include all intermediate values
+  };
+}
+    } else {
+      // For custom code, create a sandboxed function
+      const customCode = calculation.code;
 
-                  // Save the last value as result
-                  lastResult = value;
-                } else {
-                  // If not an assignment, calculate the expression
-                  lastResult = calculateVariable("result", stmt);
-
-                  // Save the step
-                  steps.push({
-                    variable: "result",
-                    expression: stmt,
-                    value: lastResult,
-                  });
-                }
-              }
-
-              // Store the final calculation result
-              result = {
-                result: lastResult,
-                steps: steps,
-                ...params, // Include all parameters in the result
-              };
-            } else {
-              // If it's a simple expression, calculate it directly
-              const value = calculateVariable("result", equation);
-
-              steps.push({
-                variable: "result",
-                expression: equation,
-                value: value,
-              });
-
-              result = {
-                result: value,
-                steps: steps,
-                ...params, // Include all parameters in the result
-              };
-            }
-          } else {
-            // For custom code, create a sandboxed function
-            const customCode = calculation.code;
-
-            // Wrap the custom code in a function that takes parameters
-            const wrappedCode = `
+      // Wrap the custom code in a function that takes parameters
+      const wrappedCode = `
         ${customCode}
         return calculate(params);
       `;
 
-            // Create and execute the function
-            const evalFunction = new Function("params", wrappedCode);
-            result = evalFunction(params);
-          }
+      // Create and execute the function
+      const evalFunction = new Function("params", wrappedCode);
+      result = evalFunction(params);
+    }
 
-          // Use default display format if none is provided
-          let displayHTML =
-            calculation.resultDisplay && calculation.resultDisplay.trim()
-              ? calculation.resultDisplay
-              : `<p>Result: \${result}</p>`;
+    // Use default display format if none is provided
+    let displayHTML =
+      calculation.resultDisplay && calculation.resultDisplay.trim()
+        ? calculation.resultDisplay
+        : `<p>Result: \${result}</p>`;
 
-          // Replace variable placeholders with actual values
-          for (const key in result) {
-            if (key !== "steps") {
-              // Skip steps array when replacing variables
-              const regex = new RegExp(`\\$\\{${key}\\}`, "g");
-              displayHTML = displayHTML.replace(regex, result[key]);
-            }
-          }
+    // Replace variable placeholders with actual values
+    for (const key in result) {
+      if (key !== "steps") {
+        // Skip steps array when replacing variables
+        const regex = new RegExp(`\\$\\{${key}\\}`, "g");
+        displayHTML = displayHTML.replace(regex, result[key]);
+      }
+    }
 
-          // Build the steps table if steps exist
-          let stepsHTML = "";
-          if (result.steps && result.steps.length > 0) {
-            stepsHTML = `
-        <div class="card mt-3">
-          <div class="card-header">Step-by-Step Calculation</div>
-          <div class="card-body p-0">
-            <table class="table table-sm table-striped mb-0">
-              <thead>
-                <tr>
-                  <th>Step</th>
-                  <th>Variable</th>
-                  <th>Expression</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-      `;
+    // Build the steps table if steps exist
+    let stepsHTML = "";
+if (result.steps && result.steps.length > 0) {
+  stepsHTML = `
+    <div class="card mt-3">
+      <div class="card-header">Step-by-Step Calculation</div>
+      <div class="card-body p-0">
+        <table class="table table-sm table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Step</th>
+              <th>Variable</th>
+              <th>Expression</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+  `;
 
-            result.steps.forEach((step, index) => {
-              stepsHTML += `
-          <tr>
-            <td>${index + 1}</td>
-            <td><code>${step.variable}</code></td>
-            <td><code>${step.expression}</code></td>
-            <td><code>${
-              typeof step.value === "number"
-                ? step.value.toString()
-                : step.value
-            }</code></td>
-          </tr>
-        `;
-            });
+  result.steps.forEach((step, index) => {
+  // Clean any comments from the variable name for display
+  console.log(step.variable);
+  // keep the last word of the variable name
+  const cleanVariableName = step.variable.replace(/\/\/.*$/g, '').replace(/\s+/g, ' ').trim().split(' ').pop();
+  console.log(cleanVariableName);
+  
+  stepsHTML += `
+    <tr>
+      <td>${index + 1}</td>
+      <td><code>${cleanVariableName}</code></td>
+      <td><code>${step.expression}</code></td>
+      <td><code>${
+        typeof step.value === "number"
+          ? step.value.toString()
+          : step.value
+      }</code></td>
+    </tr>
+  `;
+});
 
-            stepsHTML += `
-              </tbody>
-            </table>
-          </div>
-        </div>
-      `;
-          }
+  stepsHTML += `
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
 
-          // Add a section for raw parameter values
-          let rawValuesHTML = `
+    // Add a section for raw parameter values
+    let rawValuesHTML = `
       <div class="card mt-3">
         <div class="card-header d-flex justify-content-between align-items-center">
           <span>Raw Values</span>
@@ -5915,7 +6060,7 @@ $$</code></pre>
       </div>
     `;
 
-          resultContainer.html(`
+    resultContainer.html(`
       <div class="card">
         <div class="card-header">Result</div>
         <div class="card-body">
@@ -5926,28 +6071,28 @@ $$</code></pre>
       ${rawValuesHTML}
     `);
 
-          // Add toggle functionality for raw values
-          resultContainer.find(".toggle-raw-values").click(function () {
-            const container = resultContainer.find(".raw-values-container");
-            const btn = $(this);
+    // Add toggle functionality for raw values
+    resultContainer.find(".toggle-raw-values").click(function () {
+      const container = resultContainer.find(".raw-values-container");
+      const btn = $(this);
 
-            if (container.is(":visible")) {
-              container.slideUp();
-              btn.text("Show");
-            } else {
-              container.slideDown();
-              btn.text("Hide");
-            }
-          });
-        } catch (error) {
-          resultContainer.html(`
+      if (container.is(":visible")) {
+        container.slideUp();
+        btn.text("Show");
+      } else {
+        container.slideDown();
+        btn.text("Hide");
+      }
+    });
+  } catch (error) {
+    resultContainer.html(`
       <div class="alert alert-danger">
         <strong>Error:</strong> ${error.message}
       </div>
     `);
-          console.error("Calculation error:", error);
-        }
-      }
+    console.error("Calculation error:", error);
+  }
+}
 
       // Initialize calculations on page load
       $(document).ready(function () {
@@ -6077,9 +6222,127 @@ $$</code></pre>
         });
       }
 
+      // Add this function to dynamically retrieve the supported functions
+function getSupportedFunctions() {
+  // Core JavaScript Math functions
+  const mathFunctions = [
+    { name: 'pow(x, y)', description: 'x raised to the power of y' },
+    { name: 'sqrt(x)', description: 'Square root of x' },
+    { name: 'abs(x)', description: 'Absolute value of x' },
+    { name: 'round(x)', description: 'Rounds x to the nearest integer' },
+    { name: 'floor(x)', description: 'Rounds x down to the nearest integer' },
+    { name: 'ceil(x)', description: 'Rounds x up to the nearest integer' },
+    { name: 'sin(x)', description: 'Sine of x (x in radians)' },
+    { name: 'cos(x)', description: 'Cosine of x (x in radians)' },
+    { name: 'tan(x)', description: 'Tangent of x (x in radians)' },
+    { name: 'asin(x)', description: 'Arcsine of x' },
+    { name: 'acos(x)', description: 'Arccosine of x' },
+    { name: 'atan(x)', description: 'Arctangent of x' },
+    { name: 'log(x)', description: 'Natural logarithm of x' },
+    { name: 'log10(x)', description: 'Base-10 logarithm of x' },
+    { name: 'max(...values)', description: 'Returns the largest value' },
+    { name: 'min(...values)', description: 'Returns the smallest value' }
+  ];
+
+  // Add utility functions including lookup
+  const utilityFunctions = [
+    { name: 'lookup(key, table)', description: 'Look up a value in a data table using a key' },
+    { name: 'interpolate(x, x1, y1, x2, y2)', description: 'Linear interpolation between two points' }
+  ];
+
+  // Engineering functions
+  const engineeringFunctions = [
+    { name: 'ohm(v, i)', description: 'Calculate resistance (V÷I)' },
+    { name: 'watts(v, i)', description: 'Calculate power (V×I)' },
+    { name: 'volts(p, i)', description: 'Calculate voltage (P÷I)' },
+    { name: 'amps(p, v)', description: 'Calculate current (P÷V)' },
+    { name: 'seriesResistance(...resistors)', description: 'Calculate total resistance in series' },
+    { name: 'parallelResistance(...resistors)', description: 'Calculate total resistance in parallel' },
+    { name: 'celsiusToFahrenheit(celsius)', description: 'Convert Celsius to Fahrenheit' },
+    { name: 'fahrenheitToCelsius(fahrenheit)', description: 'Convert Fahrenheit to Celsius' },
+    { name: 'inchesToCm(inches)', description: 'Convert inches to centimeters' },
+    { name: 'cmToInches(cm)', description: 'Convert centimeters to inches' },
+    { name: 'kgToLbs(kg)', description: 'Convert kilograms to pounds' },
+    { name: 'lbsToKg(lbs)', description: 'Convert pounds to kilograms' }
+  ];
+
+  // Financial functions
+  const financialFunctions = [
+    { name: 'pmt(rate, nper, pv)', description: 'Calculate loan payment' },
+    { name: 'fv(rate, nper, pmt, pv)', description: 'Calculate future value' },
+    { name: 'npv(rate, values)', description: 'Calculate net present value' },
+    { name: 'irr(values, guess)', description: 'Calculate internal rate of return' }
+  ];
+
+  // Statistical functions
+  const statisticalFunctions = [
+    { name: 'mean(values)', description: 'Calculate average of values' },
+    { name: 'median(values)', description: 'Calculate median of values' },
+    { name: 'stdDev(values)', description: 'Calculate standard deviation' },
+    { name: 'sum(values)', description: 'Calculate sum of values' }
+  ];
+
+  // Constants
+  const constants = [
+    { name: 'pi', description: 'Mathematical constant π (3.14159...)' },
+    { name: 'e', description: 'Mathematical constant e (2.71828...)' }
+  ];
+
+  // Combine all functions
+  return {
+    math: mathFunctions,
+    engineering: engineeringFunctions,
+    financial: financialFunctions,
+    statistical: statisticalFunctions,
+    utility: utilityFunctions,
+    constants: constants
+  };
+}
+
+// Function to format the supported functions as a string for the AI prompt
+function formatSupportedFunctionsForPrompt() {
+  const functions = getSupportedFunctions();
+  let result = 'Available built-in functions:\n\n';
+  
+  result += 'Mathematical Functions:\n';
+  functions.math.forEach(fn => {
+    result += `- ${fn.name}: ${fn.description}\n`;
+  });
+  
+  result += '\nEngineering Functions:\n';
+  functions.engineering.forEach(fn => {
+    result += `- ${fn.name}: ${fn.description}\n`;
+  });
+  
+  result += '\nFinancial Functions:\n';
+  functions.financial.forEach(fn => {
+    result += `- ${fn.name}: ${fn.description}\n`;
+  });
+  
+  result += '\nStatistical Functions:\n';
+  functions.statistical.forEach(fn => {
+    result += `- ${fn.name}: ${fn.description}\n`;
+  });
+
+  result += '\nUtility Functions:\n';
+  functions.utility.forEach(fn => {
+    result += `- ${fn.name}: ${fn.description}\n`;
+  });
+  
+  result += '\nConstants:\n';
+  functions.constants.forEach(fn => {
+    result += `- ${fn.name}: ${fn.description}\n`;
+  });
+  
+  return result;
+}
+
       async function generateCalculationWithAI(description, domain) {
-        // Create a prompt for the AI
-        const prompt = `
+        // Get the supported functions formatted for the prompt
+  const supportedFunctionsText = formatSupportedFunctionsForPrompt();
+  
+  // Create a prompt for the AI
+  const prompt = `
 Create a calculation for the following description:
 "${description}"
 
@@ -6095,13 +6358,59 @@ Please provide the following in JSON format:
    - description: Brief explanation of the parameter
    - group: Optional group name to organize related parameters
    - calculated: true if this parameter is calculated rather than input
+   - options: Array of string options if type is "select" (e.g., ["Copper", "Aluminum", "Silver"])
 
-4. equation - A JavaScript equation or series of equations in the format:
-   intermediate1 = param1 * param2;
-   intermediate2 = intermediate1 + param3;
-   result = intermediate2 / 100;
+4. calculationType: Set this to "simple" for basic mathematical expressions (PREFERRED) or "custom" ONLY if the calculation requires conditional logic that cannot be handled by lookup tables.
 
-5. resultDisplay - HTML template to display calculation results (using \${variable} for placeholders)
+5. tables: An object containing lookup tables for material properties or other data. ALWAYS include this object even if empty. Example:
+   {
+     "resistivityTable": {
+       "Copper": 1.68e-8,
+       "Aluminum": 2.82e-8,
+       "Silver": 1.59e-8
+     }
+   }
+
+6. equation - ONLY for simple calculationType. Must use only basic mathematical operators and function calls.
+   DO NOT use switch/case, if/else, or other control flow statements in the equation.
+   DO NOT use special characters like ρ (rho) or Ω (ohm), use regular ASCII characters.
+   
+   Format as a series of equations (each ending with semicolon):
+   // Use lookup function for material properties
+   materialResistivity = lookup(material, tables.resistivityTable);
+   // Calculate resistance
+   resistance = (materialResistivity * length) / (crossSectionalArea * 1e-6);
+   result = resistance;
+   
+7. code - ONLY for custom calculationType, and ONLY if a simple equation with lookup tables cannot solve the problem.
+   This should define a function called 'calculate' that takes 'params' as input and returns the calculation result.
+   Even in custom code, prefer using lookup tables instead of large switch statements:
+   
+   function calculate(params) {
+     const resistivityTable = {
+       'Copper': 1.68e-8,
+       'Aluminum': 2.82e-8,
+       'Silver': 1.59e-8
+     };
+     
+     const resistivity = resistivityTable[params.material] || resistivityTable['Copper'];
+     const resistance = (resistivity * params.length) / (params.crossSectionalArea * 1e-6);
+     
+     return {
+       result: resistance,
+       resistivity: resistivity,
+       resistance: resistance
+     };
+   }
+
+8. resultDisplay - HTML template to display calculation results (using \${variable} for placeholders)
+
+${supportedFunctionsText}
+
+IMPORTANT: 
+- Always prefer using "simple" calculationType with lookup tables over "custom" code unless absolutely necessary.
+- Do not use special characters or symbols in equations, stick to standard ASCII characters only.
+- Tables will be automatically included in the calculation environment, so just use tables.tableName in your equations.
 
 Format as valid JSON that can be parsed with JSON.parse().
 `;
@@ -6243,63 +6552,104 @@ Format as valid JSON that can be parsed with JSON.parse().
       }
 
       function applyGeneratedCalculation(data) {
-        // Fill in the calculation form with the generated data
-        $("#calculationTitle").val(data.title || "");
-        $("#calculationDesc").val(data.description || "");
-        $("#calculationType").val("simple");
-        $("#calculationEquation").val(data.equation || "");
-        $("#resultDisplay").val(data.resultDisplay || "");
+  // Fill in the calculation form with the generated data
+  $("#calculationTitle").val(data.title || "");
+  $("#calculationDesc").val(data.description || "");
+  
+  // Set the calculation type based on what was generated
+  const calculationType = data.calculationType || "simple";
+  $("#calculationType").val(calculationType);
+  
+  if (calculationType === "simple") {
+    // If data includes tables, format them as JSON and include them in the equation
+    let equationText = data.equation || "";
+    
+    if (data.tables && Object.keys(data.tables).length > 0) {
+      // Format tables with proper spacing for readability
+      const tablesJSON = JSON.stringify(data.tables, null, 2);
+      // Add tables at the beginning of the equation with clear comments
+      equationText = `// Lookup tables - DO NOT MODIFY THIS SECTION
+tables = ${tablesJSON};
 
-        // Clear existing parameters and add the generated ones
-        $("#parametersContainer").empty();
+// Calculation equations
+${equationText}`;
+    } else {
+      // Add an empty tables object to avoid reference errors
+      equationText = `// Initialize empty tables object
+tables = {};
 
-        if (data.parameters && data.parameters.length > 0) {
-          // Group parameters by their group property
-          const groups = {};
-          const ungrouped = [];
+// Calculation equations
+${equationText}`;
+    }
+    
+    $("#calculationEquation").val(equationText);
+    $("#calculationCode").val("");
+    $("#simpleEquationContainer").removeClass("d-none");
+    $("#customCodeContainer").addClass("d-none");
+  } else {
+    $("#calculationEquation").val("");
+    $("#calculationCode").val(data.code || "");
+    $("#simpleEquationContainer").addClass("d-none");
+    $("#customCodeContainer").removeClass("d-none");
+  }
+  
+  $("#resultDisplay").val(data.resultDisplay || "");
 
-          data.parameters.forEach((param) => {
-            if (param.group) {
-              if (!groups[param.group]) {
-                groups[param.group] = [];
-              }
-              groups[param.group].push(param);
-            } else {
-              ungrouped.push(param);
-            }
-          });
+  // Clear existing parameters and add the generated ones
+  $("#parametersContainer").empty();
 
-          // Add ungrouped parameters first
-          ungrouped.forEach((param) => {
-            addParameterRow(param);
-          });
+  if (data.parameters && data.parameters.length > 0) {
+    // Group parameters by their group property
+    const groups = {};
+    const ungrouped = [];
 
-          // Add grouped parameters
-          Object.keys(groups).forEach((groupName) => {
-            // Create a group
-            const group = addParameterGroup();
-            $(group).find(".param-group-name").val(groupName);
-
-            // Add parameters to the group
-            groups[groupName].forEach((param) => {
-              const paramRow = addParameterRow(param);
-              $(group).find(".group-parameters").append(paramRow);
-            });
-          });
-        } else {
-          // Add one empty parameter row
-          addParameterRow();
+    data.parameters.forEach((param) => {
+      if (param.group) {
+        if (!groups[param.group]) {
+          groups[param.group] = [];
         }
-
-        // Force custom code container to hide and equation container to show
-        $("#customCodeContainer").addClass("d-none");
-        $("#simpleEquationContainer").removeClass("d-none");
-
-        // Re-initialize drag and drop
-        setTimeout(initializeParamDragAndDrop, 50);
-
-        showNotification("AI-generated calculation applied to form", "success");
+        groups[param.group].push(param);
+      } else {
+        ungrouped.push(param);
       }
+    });
+
+    // Add ungrouped parameters first
+    ungrouped.forEach((param) => {
+      addParameterRow(param);
+    });
+
+    // Add grouped parameters
+    Object.keys(groups).forEach((groupName) => {
+      // Create a group
+      const group = addParameterGroup();
+      $(group).find(".param-group-name").val(groupName);
+
+      // Add parameters to the group
+      groups[groupName].forEach((param) => {
+        const paramRow = addParameterRow(param);
+        $(group).find(".group-parameters").append(paramRow);
+      });
+    });
+  } else {
+    // Add one empty parameter row
+    addParameterRow();
+  }
+
+  // Force custom code container to hide and equation container to show
+  if (calculationType === "simple") {
+    $("#customCodeContainer").addClass("d-none");
+    $("#simpleEquationContainer").removeClass("d-none");
+  } else {
+    $("#customCodeContainer").removeClass("d-none");
+    $("#simpleEquationContainer").addClass("d-none");
+  }
+
+  // Re-initialize drag and drop
+  setTimeout(initializeParamDragAndDrop, 50);
+
+  showNotification("AI-generated calculation applied to form", "success");
+}
 
       // Initialize the AI assist button on document ready
       $(document).ready(function () {
