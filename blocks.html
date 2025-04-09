@@ -103,37 +103,33 @@
 </head>
 <body>
   <div class="container">
-    <h1 class="mb-4">Markdown Note System</h1>
-    
-    <div class="alert alert-info">
-      This system helps you manage technical blocks, organize references, and create documents using Markdown formatting.
-    </div>
+        <h4>Markdown Note System</h4>
 
     <!-- Navigation Tabs -->
-    <ul class="nav nav-tabs" id="viewTabs" role="tablist">
+    <ul class="nav nav-tabs sticky-top bg-white" id="viewTabs" role="tablist" style="z-index: 1030;">
       <li class="nav-item">
-        <a class="nav-link active" id="blocks-tab" data-toggle="tab" href="#blocksView" role="tab">Blocks</a>
+      <a class="nav-link active" id="blocks-tab" data-toggle="tab" href="#blocksView" role="tab">Blocks</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" id="references-tab" data-toggle="tab" href="#referencesView" role="tab">References</a>
+      <a class="nav-link" id="references-tab" data-toggle="tab" href="#referencesView" role="tab">References</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" id="documents-tab" data-toggle="tab" href="#documentsView" role="tab">Documents</a>
+      <a class="nav-link" id="documents-tab" data-toggle="tab" href="#documentsView" role="tab">Documents</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" id="collections-tab" data-toggle="tab" href="#collectionsView" role="tab">Collections</a>
+      <a class="nav-link" id="collections-tab" data-toggle="tab" href="#collectionsView" role="tab">Collections</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" id="tags-tab" data-toggle="tab" href="#tagsView" role="tab">Tags</a>
+      <a class="nav-link" id="tags-tab" data-toggle="tab" href="#tagsView" role="tab">Tags</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" id="actions-tab" data-toggle="tab" href="#actionsView" role="tab">Actions</a>
+      <a class="nav-link" id="actions-tab" data-toggle="tab" href="#actionsView" role="tab">Actions</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" id="workflows-tab" data-toggle="tab" href="#workflowsView" role="tab">Workflows</a>
+      <a class="nav-link" id="workflows-tab" data-toggle="tab" href="#workflowsView" role="tab">Workflows</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" id="settings-tab" data-toggle="tab" href="#settingsView" role="tab">Settings</a>
+      <a class="nav-link" id="settings-tab" data-toggle="tab" href="#settingsView" role="tab">Settings</a>
       </li>
     </ul>
 
@@ -4190,12 +4186,300 @@ $$</code></pre>
       }
       
       const importOption = $('input[name="importOption"]:checked').val();
-      processImport(importedData, importOption);
+      // Instead of processing immediately, show selection interface
+      showImportSelectionInterface(importedData, importOption);
       
       $("#importFile").val("");
-      importedData = null;
       $("#importOptionsModal").modal("hide");
     });
+
+    function showImportSelectionInterface(data, importOption) {
+      // Create a modal for selection
+      const selectionModal = $(`
+        <div class="modal fade" id="importSelectionModal" tabindex="-1" role="dialog">
+          <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Select Items to Import</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <div class="row mb-3">
+                  <div class="col">
+                    <div class="btn-group">
+                      <button class="btn btn-outline-secondary select-all-btn">Select All</button>
+                      <button class="btn btn-outline-secondary deselect-all-btn">Deselect All</button>
+                    </div>
+                  </div>
+                  <div class="col text-right">
+                    <span class="badge badge-info selected-count">0 selected</span>
+                  </div>
+                </div>
+                
+                <ul class="nav nav-tabs" id="importTabs" role="tablist">
+                  <li class="nav-item">
+                    <a class="nav-link active" id="blocks-import-tab" data-toggle="tab" href="#blocksImport" role="tab">
+                      Blocks <span class="badge badge-secondary block-count">0</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" id="refs-import-tab" data-toggle="tab" href="#refsImport" role="tab">
+                      References <span class="badge badge-secondary ref-count">0</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" id="docs-import-tab" data-toggle="tab" href="#docsImport" role="tab">
+                      Documents <span class="badge badge-secondary doc-count">0</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" id="actions-import-tab" data-toggle="tab" href="#actionsImport" role="tab">
+                      Actions <span class="badge badge-secondary action-count">0</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" id="collections-import-tab" data-toggle="tab" href="#collectionsImport" role="tab">
+                      Collections <span class="badge badge-secondary collection-count">0</span>
+                    </a>
+                  </li>
+                </ul>
+                
+                <div class="tab-content border border-top-0 p-3" style="max-height: 50vh; overflow-y: auto;">
+                  <div class="tab-pane fade show active" id="blocksImport" role="tabpanel"></div>
+                  <div class="tab-pane fade" id="refsImport" role="tabpanel"></div>
+                  <div class="tab-pane fade" id="docsImport" role="tabpanel"></div>
+                  <div class="tab-pane fade" id="actionsImport" role="tabpanel"></div>
+                  <div class="tab-pane fade" id="collectionsImport" role="tabpanel"></div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="processSelectedImport">Import Selected Items</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).appendTo('body');
+      
+      // Populate with import data
+      populateImportSelection(data, importOption);
+      
+      // Show the modal
+      selectionModal.modal('show');
+      
+      // Handle modal closing
+      selectionModal.on('hidden.bs.modal', function() {
+        selectionModal.remove();
+        importedData = null;
+      });
+      
+      // Attach event handlers
+      selectionModal.find('.select-all-btn').click(function() {
+        selectionModal.find('.import-item-checkbox').prop('checked', true);
+        updateSelectedCount();
+      });
+      
+      selectionModal.find('.deselect-all-btn').click(function() {
+        selectionModal.find('.import-item-checkbox').prop('checked', false);
+        updateSelectedCount();
+      });
+      
+      selectionModal.find('#processSelectedImport').click(function() {
+        const selectedItems = {
+          blocks: [],
+          references: [],
+          documents: [],
+          actions: [],
+          collections: []
+        };
+        
+        // Collect selected blocks
+        selectionModal.find('#blocksImport .import-item-checkbox:checked').each(function() {
+          const index = $(this).data('index');
+          selectedItems.blocks.push(data.blocks[index]);
+        });
+        
+        // Collect selected references
+        selectionModal.find('#refsImport .import-item-checkbox:checked').each(function() {
+          const index = $(this).data('index');
+          selectedItems.references.push(data.references[index]);
+        });
+        
+        // Collect selected documents
+        selectionModal.find('#docsImport .import-item-checkbox:checked').each(function() {
+          const index = $(this).data('index');
+          selectedItems.documents.push(data.documents[index]);
+        });
+        
+        // Collect selected actions
+        selectionModal.find('#actionsImport .import-item-checkbox:checked').each(function() {
+          const index = $(this).data('index');
+          selectedItems.actions.push(data.actions[index]);
+        });
+        
+        // Collect selected collections
+        selectionModal.find('#collectionsImport .import-item-checkbox:checked').each(function() {
+          const index = $(this).data('index');
+          selectedItems.collections.push(data.collections[index]);
+        });
+        
+        // Process selected items
+        processImport(selectedItems, importOption);
+        
+        // Close modal
+        selectionModal.modal('hide');
+      });
+      
+      function updateSelectedCount() {
+        const count = selectionModal.find('.import-item-checkbox:checked').length;
+        selectionModal.find('.selected-count').text(count + ' selected');
+      }
+      
+      // Listen for checkbox changes to update count
+      selectionModal.on('change', '.import-item-checkbox', updateSelectedCount);
+    }
+
+    function populateImportSelection(data, importOption) {
+      // Populate blocks
+      const blocksContainer = $('#blocksImport');
+      if (data.blocks && data.blocks.length) {
+        let blocksHtml = '<div class="form-group"><div class="list-group">';
+        data.blocks.forEach((block, index) => {
+          blocksHtml += `
+            <div class="list-group-item">
+              <div class="custom-control custom-checkbox">
+                <input type="checkbox" class="custom-control-input import-item-checkbox" id="block-${index}" data-index="${index}" checked>
+                <label class="custom-control-label" for="block-${index}">
+                  <strong>${block.title || 'Block ' + block.id}</strong>
+                  <small class="text-muted">(ID: ${block.id})</small>
+                  <p class="mb-0 small">${block.text.substring(0, 100)}${block.text.length > 100 ? '...' : ''}</p>
+                </label>
+              </div>
+            </div>
+          `;
+        });
+        blocksHtml += '</div></div>';
+        blocksContainer.html(blocksHtml);
+        $('.block-count').text(data.blocks.length);
+      } else {
+        blocksContainer.html('<p class="text-muted">No blocks to import</p>');
+        $('.block-count').text(0);
+      }
+      
+      // Populate references
+      const refsContainer = $('#refsImport');
+      if (data.references && data.references.length) {
+        let refsHtml = '<div class="form-group"><div class="list-group">';
+        data.references.forEach((ref, index) => {
+          refsHtml += `
+            <div class="list-group-item">
+              <div class="custom-control custom-checkbox">
+                <input type="checkbox" class="custom-control-input import-item-checkbox" id="ref-${index}" data-index="${index}" checked>
+                <label class="custom-control-label" for="ref-${index}">
+                  <strong>${ref.id}</strong> - ${ref.name}
+                  <small class="text-muted">${ref.type || ''}</small>
+                  ${ref.description ? `<p class="mb-0 small">${ref.description}</p>` : ''}
+                </label>
+              </div>
+            </div>
+          `;
+        });
+        refsHtml += '</div></div>';
+        refsContainer.html(refsHtml);
+        $('.ref-count').text(data.references.length);
+      } else {
+        refsContainer.html('<p class="text-muted">No references to import</p>');
+        $('.ref-count').text(0);
+      }
+      
+      // Populate documents
+      const docsContainer = $('#docsImport');
+      if (data.documents && data.documents.length) {
+        let docsHtml = '<div class="form-group"><div class="list-group">';
+        data.documents.forEach((doc, index) => {
+          docsHtml += `
+            <div class="list-group-item">
+              <div class="custom-control custom-checkbox">
+                <input type="checkbox" class="custom-control-input import-item-checkbox" id="doc-${index}" data-index="${index}" checked>
+                <label class="custom-control-label" for="doc-${index}">
+                  <strong>${doc.title}</strong>
+                  <small class="text-muted">(ID: ${doc.id})</small>
+                  <small>${doc.paragraphs ? doc.paragraphs.length + ' paragraphs' : ''}</small>
+                </label>
+              </div>
+            </div>
+          `;
+        });
+        docsHtml += '</div></div>';
+        docsContainer.html(docsHtml);
+        $('.doc-count').text(data.documents.length);
+      } else {
+        docsContainer.html('<p class="text-muted">No documents to import</p>');
+        $('.doc-count').text(0);
+      }
+      
+      // Populate actions
+      const actionsContainer = $('#actionsImport');
+      if (data.actions && data.actions.length) {
+        let actionsHtml = '<div class="form-group"><div class="list-group">';
+        data.actions.forEach((action, index) => {
+          actionsHtml += `
+            <div class="list-group-item">
+              <div class="custom-control custom-checkbox">
+                <input type="checkbox" class="custom-control-input import-item-checkbox" id="action-${index}" data-index="${index}" checked>
+                <label class="custom-control-label" for="action-${index}">
+                  <strong>${action.title}</strong>
+                  <small class="text-muted">(ID: ${action.id})</small>
+                  ${action.description ? `<p class="mb-0 small">${action.description}</p>` : ''}
+                </label>
+              </div>
+            </div>
+          `;
+        });
+        actionsHtml += '</div></div>';
+        actionsContainer.html(actionsHtml);
+        $('.action-count').text(data.actions.length);
+      } else {
+        actionsContainer.html('<p class="text-muted">No actions to import</p>');
+        $('.action-count').text(0);
+      }
+      
+      // Populate collections
+      const collectionsContainer = $('#collectionsImport');
+      if (data.collections && data.collections.length) {
+        let collectionsHtml = '<div class="form-group"><div class="list-group">';
+        data.collections.forEach((collection, index) => {
+          collectionsHtml += `
+            <div class="list-group-item">
+              <div class="custom-control custom-checkbox">
+                <input type="checkbox" class="custom-control-input import-item-checkbox" id="collection-${index}" data-index="${index}" checked>
+                <label class="custom-control-label" for="collection-${index}">
+                  <strong>${collection.name}</strong>
+                  <small class="text-muted">(ID: ${collection.id})</small>
+                  ${collection.description ? `<p class="mb-0 small">${collection.description}</p>` : ''}
+                </label>
+              </div>
+            </div>
+          `;
+        });
+        collectionsHtml += '</div></div>';
+        collectionsContainer.html(collectionsHtml);
+        $('.collection-count').text(data.collections.length);
+      } else {
+        collectionsContainer.html('<p class="text-muted">No collections to import</p>');
+        $('.collection-count').text(0);
+      }
+      
+      // Update the total count
+      const totalSelected = (data.blocks?.length || 0) + 
+                            (data.references?.length || 0) + 
+                            (data.documents?.length || 0) + 
+                            (data.actions?.length || 0) + 
+                            (data.collections?.length || 0);
+      $('.selected-count').text(totalSelected + ' selected');
+    }
 
     function processImport(data, option) {
       const tx = db.transaction(["documents", "blocks", "references", "actions", "collections"], "readwrite");
@@ -4248,8 +4532,6 @@ $$</code></pre>
       };
       
       processBlocks(data.blocks);
-      
-      processBlocks(data.clauses);
       
       if (data.references && data.references.length > 0) {
         data.references.forEach(ref => {
@@ -4304,7 +4586,13 @@ $$</code></pre>
       
       tx.oncomplete = function() {
         const actionText = option === "merge" ? "merged" : "imported";
-        showNotification(`Import completed successfully! Data was ${actionText}.`);
+        const totalImported = (data.documents?.length || 0) + 
+                            (data.blocks?.length || 0) + 
+                            (data.references?.length || 0) + 
+                            (data.actions?.length || 0) + 
+                            (data.collections?.length || 0);
+        
+        showNotification(`Import completed! ${totalImported} items ${actionText}.`);
         loadDocuments();
         loadBlocks();
         loadReferencesMetadata();
@@ -6129,6 +6417,9 @@ $$</code></pre>
     $(document).ready(function() {
       loadCollections();
     });
+  </script>
+  <script>
+
   </script>
   <script>
     // Load Mermaid and KaTeX properly
