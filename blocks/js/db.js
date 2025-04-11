@@ -1,9 +1,13 @@
 /**
- * Database setup and management
+ * Enhanced Database setup and management
+ * - Fixes circular dependency issues 
+ * - Ensures proper initialization
+ * - Provides reliable database access
  */
 
-// Database instance
+// Define global variables for database instance
 let db;
+let dbInitialized = false;
 
 /**
  * Initialize the database
@@ -15,99 +19,105 @@ function initializeDB() {
     const maxRetries = 3;
     
     function attemptConnection() {
+      console.log("Attempting database connection");
       const request = indexedDB.open("EnhancedNoteDB", 7);
       
-      // Keep your existing onupgradeneeded handler
+      // Handle database upgrade
       request.onupgradeneeded = function(e) {
+        console.log("Database upgrade needed");
         db = e.target.result;
       
-      // Only create stores if they don't already exist
-      if (!db.objectStoreNames.contains("documents")) {
-        db.createObjectStore("documents", { keyPath: "id", autoIncrement: true });
-      }
+        // Only create stores if they don't already exist
+        if (!db.objectStoreNames.contains("documents")) {
+          db.createObjectStore("documents", { keyPath: "id", autoIncrement: true });
+        }
+        
+        // Rename clauses store to blocks if needed
+        if (db.objectStoreNames.contains("clauses") && !db.objectStoreNames.contains("blocks")) {
+          // Get all clauses
+          const tempStore = e.target.transaction.objectStore("clauses");
+          const clauses = [];
+          tempStore.openCursor().onsuccess = function(e) {
+            const cursor = e.target.result;
+            if(cursor) {
+              clauses.push(cursor.value);
+              cursor.continue();
+            } else {
+              // Delete old store and create new one
+              db.deleteObjectStore("clauses");
+              const blockStore = db.createObjectStore("blocks", { keyPath: "id", autoIncrement: true });
+              blockStore.createIndex("tags", "tags", { unique: false, multiEntry: true });
+              
+              // Add clauses data to new store in next transaction
+              const tx = db.transaction("blocks", "readwrite");
+              const store = tx.objectStore("blocks");
+              clauses.forEach(clause => {
+                // Add title field to existing clauses
+                clause.title = "Block " + clause.id; // Default title
+                store.add(clause);
+              });
+            }
+          };
+        } else if (!db.objectStoreNames.contains("blocks")) {
+          // Create blocks store if it doesn't exist
+          const blockStore = db.createObjectStore("blocks", { keyPath: "id", autoIncrement: true });
+          blockStore.createIndex("tags", "tags", { unique: false, multiEntry: true });
+        }
+        
+        if (!db.objectStoreNames.contains("references")) {
+          // Create or update references store with additional fields
+          const refStore = db.createObjectStore("references", { keyPath: "id" });
+          // No need to create indexes for simple lookup table
+        }
+        
+        // Create actions store if it doesn't exist
+        if (!db.objectStoreNames.contains("actions")) {
+          const actionsStore = db.createObjectStore("actions", { keyPath: "id", autoIncrement: true });
+          actionsStore.createIndex("tags", "tags", { unique: false, multiEntry: true });
+        }
+
+        // Create workflows store if it doesn't exist
+        if (!db.objectStoreNames.contains("workflows")) {
+          const workflowsStore = db.createObjectStore("workflows", { keyPath: "id", autoIncrement: true });
+          workflowsStore.createIndex("name", "name", { unique: false });
+        }
+
+        // Create collections store if it doesn't exist
+        if (!db.objectStoreNames.contains("collections")) {
+          const collectionsStore = db.createObjectStore("collections", { keyPath: "id", autoIncrement: true });
+          collectionsStore.createIndex("name", "name", { unique: false });
+        }
+      };
+    
+      request.onsuccess = function(e) {
+        db = e.target.result;
+        window.db = db; // Make db accessible globally
+        dbInitialized = true;
+        console.log("Database initialized successfully");
+        resolve(db);
+      };
       
-      // Rename clauses store to blocks if needed
-      if (db.objectStoreNames.contains("clauses") && !db.objectStoreNames.contains("blocks")) {
-        // Get all clauses
-        const tempStore = e.target.transaction.objectStore("clauses");
-        const clauses = [];
-        tempStore.openCursor().onsuccess = function(e) {
-          const cursor = e.target.result;
-          if(cursor) {
-            clauses.push(cursor.value);
-            cursor.continue();
+      request.onerror = function(e) {
+        const error = e.target.error;
+        console.error("DB error:", error);
+        
+        if (retryCount < maxRetries) {
+          retryCount++;
+          console.log(`Retry attempt ${retryCount}/${maxRetries}...`);
+          setTimeout(attemptConnection, 1000); // Wait before retrying
+        } else {
+          // Show user-friendly error
+          if (window.Helpers && window.Helpers.showNotification) {
+            window.Helpers.showNotification(`Database error: ${error.message}. Try reloading the page or reset the database in Settings.`, "danger", 8000);
           } else {
-            // Delete old store and create new one
-            db.deleteObjectStore("clauses");
-            const blockStore = db.createObjectStore("blocks", { keyPath: "id", autoIncrement: true });
-            blockStore.createIndex("tags", "tags", { unique: false, multiEntry: true });
-            
-            // Add clauses data to new store in next transaction
-            const tx = db.transaction("blocks", "readwrite");
-            const store = tx.objectStore("blocks");
-            clauses.forEach(clause => {
-              // Add title field to existing clauses
-              clause.title = "Block " + clause.id; // Default title
-              store.add(clause);
-            });
+            console.error("Helpers not available for error notification");
           }
-        };
-      } else if (!db.objectStoreNames.contains("blocks")) {
-        // Create blocks store if it doesn't exist
-        const blockStore = db.createObjectStore("blocks", { keyPath: "id", autoIncrement: true });
-        blockStore.createIndex("tags", "tags", { unique: false, multiEntry: true });
-      }
-      
-      if (!db.objectStoreNames.contains("references")) {
-        // Create or update references store with additional fields
-        const refStore = db.createObjectStore("references", { keyPath: "id" });
-        // No need to create indexes for simple lookup table
-      }
-      
-      // Create actions store if it doesn't exist
-      if (!db.objectStoreNames.contains("actions")) {
-        const actionsStore = db.createObjectStore("actions", { keyPath: "id", autoIncrement: true });
-        actionsStore.createIndex("tags", "tags", { unique: false, multiEntry: true });
-      }
-
-      // Create workflows store if it doesn't exist
-      if (!db.objectStoreNames.contains("workflows")) {
-        const workflowsStore = db.createObjectStore("workflows", { keyPath: "id", autoIncrement: true });
-        workflowsStore.createIndex("name", "name", { unique: false });
-      }
-
-      // Create collections store if it doesn't exist
-      if (!db.objectStoreNames.contains("collections")) {
-        const collectionsStore = db.createObjectStore("collections", { keyPath: "id", autoIncrement: true });
-        collectionsStore.createIndex("name", "name", { unique: false });
-      }
-    };
+          reject(error);
+        }
+      };
+    }
     
-    request.onsuccess = function(e) {
-      db = e.target.result;
-      window.db = db; // Make db accessible globally
-      console.log("Database initialized successfully");
-      window.dbInitialized = true; // Add this flag
-      resolve(db);
-    };
-    
-    request.onerror = function(e) {
-      const error = e.target.error;
-      console.error("DB error:", error);
-      
-      if (retryCount < maxRetries) {
-        retryCount++;
-        console.log(`Retry attempt ${retryCount}/${maxRetries}...`);
-        setTimeout(attemptConnection, 1000); // Wait before retrying
-      } else {
-        // Show user-friendly error
-        showNotification(`Database error: ${error.message}. Try reloading the page or reset the database in Settings.`, "danger", 8000);
-        reject(error);
-      }
-    };
-  }
-  
-  attemptConnection();
+    attemptConnection();
   });
 }
 
@@ -126,15 +136,20 @@ function fetchBlockById(id) {
     try {
       const transaction = db.transaction("blocks", "readonly");
       const store = transaction.objectStore("blocks");
-      
       const request = store.get(parseInt(id));
+      
       request.onsuccess = function(e) {
-        resolve(e.target.result);
+        if (e.target.result) {
+          resolve(e.target.result);
+        } else {
+          reject(new Error(`Block with ID ${id} not found`));
+        }
       };
+      
       request.onerror = function(e) {
         reject(e.target.error);
       };
-    } catch(err) {
+    } catch (err) {
       reject(err);
     }
   });
@@ -155,15 +170,20 @@ function fetchDocumentById(id) {
     try {
       const transaction = db.transaction("documents", "readonly");
       const store = transaction.objectStore("documents");
-      
       const request = store.get(parseInt(id));
+      
       request.onsuccess = function(e) {
-        resolve(e.target.result);
+        if (e.target.result) {
+          resolve(e.target.result);
+        } else {
+          reject(new Error(`Document with ID ${id} not found`));
+        }
       };
+      
       request.onerror = function(e) {
         reject(e.target.error);
       };
-    } catch(err) {
+    } catch (err) {
       reject(err);
     }
   });
@@ -376,3 +396,73 @@ function resetDatabase() {
     };
   });
 }
+
+/**
+ * Check if database is initialized
+ * @returns {boolean} Whether the database is initialized
+ */
+function isDatabaseInitialized() {
+  return dbInitialized && db !== undefined;
+}
+
+/**
+ * Reset the database handler function
+ */
+function resetDatabaseHandler() {
+  if (window.Helpers && window.Helpers.confirm) {
+    window.Helpers.confirm({
+      title: "Reset Database",
+      message: "WARNING: This will permanently delete all your data including blocks, references, and documents. This action cannot be undone. Are you sure you want to proceed?",
+      confirmButtonClass: "btn-danger",
+      confirmText: "Reset Database"
+    }).then(confirmed => {
+      if (confirmed) {
+        resetDatabase()
+          .then(() => {
+            if (window.Helpers && window.Helpers.showNotification) {
+              window.Helpers.showNotification("Database has been reset. Please refresh the page to create a new database.", "success", 10000);
+            }
+            $(".container").prepend(`
+              <div class="alert alert-success">
+                <strong>Success!</strong> Database has been reset. 
+                <a href="javascript:location.reload()" class="alert-link">Click here to refresh the page</a> or refresh manually to complete the process.
+              </div>
+            `);
+          })
+          .catch(error => {
+            console.error("Error resetting database:", error);
+            if (window.Helpers && window.Helpers.showNotification) {
+              window.Helpers.showNotification("Error deleting database: " + error.message, "danger");
+            }
+          });
+      }
+    });
+  } else {
+    if (confirm("WARNING: This will permanently delete all your data including blocks, references, and documents. This action cannot be undone. Are you sure you want to proceed?")) {
+      resetDatabase()
+        .then(() => {
+          alert("Database has been reset. Please refresh the page to create a new database.");
+          $(".container").prepend(`
+            <div class="alert alert-success">
+              <strong>Success!</strong> Database has been reset. 
+              <a href="javascript:location.reload()" class="alert-link">Click here to refresh the page</a> or refresh manually to complete the process.
+            </div>
+          `);
+        })
+        .catch(error => {
+          console.error("Error resetting database:", error);
+          alert("Error deleting database: " + error.message);
+        });
+    }
+  }
+}
+
+// Export functions to global scope
+window.initializeDB = initializeDB;
+window.fetchBlockById = fetchBlockById;
+window.fetchDocumentById = fetchDocumentById;
+window.exportAllData = exportAllData;
+window.importData = importData;
+window.resetDatabase = resetDatabase;
+window.resetDatabaseHandler = resetDatabaseHandler;
+window.isDatabaseInitialized = isDatabaseInitialized;

@@ -1,5 +1,6 @@
 /**
  * Collections management module
+ * Refactored to use the Helpers module
  */
 
 /**
@@ -62,23 +63,33 @@ function editCollection(collection) {
  * @param {number} id - The collection ID to delete
  */
 function deleteCollection(id) {
-  if (confirm("Are you sure you want to delete this collection?")) {
-    if (!db) {
-      showNotification("Database not available. Please refresh the page.", "danger");
-      return;
-    }
-    
-    const transaction = db.transaction("collections", "readwrite");
-    const store = transaction.objectStore("collections");
-    
-    store.delete(id).onsuccess = function() {
-      loadCollections();
-      if (editingCollectionId === id) {
-        resetCollectionForm();
+  // Using the new Helpers.confirm for better UX
+  Helpers.confirm({
+    title: "Delete Collection",
+    message: "Are you sure you want to delete this collection? This action cannot be undone.",
+    confirmButtonClass: "btn-danger",
+    confirmText: "Delete"
+  }).then(confirmed => {
+    if (confirmed) {
+      if (!db) {
+        Helpers.showNotification("Database not available. Please refresh the page.", "danger");
+        return;
       }
-      showNotification("Collection deleted successfully!");
-    };
-  }
+      
+      Helpers.deleteById("collections", id)
+        .then(() => {
+          loadCollections();
+          if (editingCollectionId === id) {
+            resetCollectionForm();
+          }
+          Helpers.showNotification("Collection deleted successfully!");
+        })
+        .catch(error => {
+          console.error("Error deleting collection:", error);
+          Helpers.showNotification("Failed to delete collection: " + error.message, "danger");
+        });
+    }
+  });
 }
 
 /**
@@ -150,7 +161,7 @@ function loadBlocksForCollection(searchTerm = "") {
               <div class="d-flex justify-content-between align-items-center">
                 <div>
                   <h6>${block.title || 'Block ' + block.id}</h6>
-                  <small>${block.text.substring(0, 100)}...</small>
+                  <small>${Helpers.truncate(block.text, 100)}</small>
                 </div>
                 <button class="btn btn-sm btn-primary add-block-btn">Add</button>
               </div>
@@ -239,12 +250,12 @@ function handleCollectionFormSubmit(e) {
   const tags = $("#collectionTags").val().split(",").map(t => t.trim()).filter(t => t);
   
   if (!name) {
-    showNotification("Collection name is required", "warning");
+    Helpers.showNotification("Collection name is required", "warning");
     return;
   }
   
   if (!db) {
-    showNotification("Database not available. Please refresh the page.", "danger");
+    Helpers.showNotification("Database not available. Please refresh the page.", "danger");
     return;
   }
   
@@ -262,13 +273,13 @@ function handleCollectionFormSubmit(e) {
   if (editingCollectionId) {
     collection.id = editingCollectionId;
     store.put(collection).onsuccess = function() {
-      showNotification("Collection updated successfully!");
+      Helpers.showNotification("Collection updated successfully!");
       resetCollectionForm();
       loadCollections();
     };
   } else {
     store.add(collection).onsuccess = function() {
-      showNotification("Collection created successfully!");
+      Helpers.showNotification("Collection created successfully!");
       resetCollectionForm();
       loadCollections();
     };
@@ -338,33 +349,33 @@ function previewCollection(collection) {
     const id = $(this).data("id");
     
     if (type === "block") {
-      fetchBlockById(id)
+      Helpers.getById("blocks", id)
         .then(block => {
           if (block) {
             // Go to blocks tab and show block details
             $("#blocks-tab").tab('show');
             showBlockDetails(block);
           } else {
-            showNotification("Block not found", "danger");
+            Helpers.showNotification("Block not found", "danger");
           }
         })
         .catch(error => {
           console.error("Error fetching block:", error);
-          showNotification("Error: " + error.message, "danger");
+          Helpers.showNotification("Error: " + error.message, "danger");
         });
     } else {
-      fetchDocumentById(id)
+      Helpers.getById("documents", id)
         .then(doc => {
           if (doc) {
             $("#documents-tab").tab('show');
             previewDocument(doc);
           } else {
-            showNotification("Document not found", "danger");
+            Helpers.showNotification("Document not found", "danger");
           }
         })
         .catch(error => {
           console.error("Error fetching document:", error);
-          showNotification("Error: " + error.message, "danger");
+          Helpers.showNotification("Error: " + error.message, "danger");
         });
     }
   });
@@ -448,7 +459,7 @@ function quickSearchBlocksForCollection(query) {
       let html = '';
       results.forEach(result => {
         const block = result.item;
-        const preview = block.text.length > 100 ? block.text.substring(0, 100) + "..." : block.text;
+        const preview = Helpers.truncate(block.text, 100);
         
         html += `
           <div class="card mb-2">

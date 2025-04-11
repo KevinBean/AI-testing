@@ -1,5 +1,6 @@
 /**
  * Block management module
+ * Updated to use the Helpers module pattern
  */
 
 /**
@@ -39,7 +40,7 @@ function handleBlockFormSubmit(e) {
   
   // Check database is available
   if (!db) {
-    showNotification("Database is not available. Please refresh the page.", "danger");
+    Helpers.showNotification("Database is not available. Please refresh the page.", "danger");
     return;
   }
   
@@ -73,7 +74,7 @@ function handleBlockFormSubmit(e) {
         block.updated = new Date();
         
         store.put(block).onsuccess = function() {
-          showNotification("Block updated successfully!");
+          Helpers.showNotification("Block updated successfully!");
           editingBlockId = null;
           $("#blockForm")[0].reset();
           $("#blockForm button[type=submit]").text("Add Block");
@@ -93,7 +94,7 @@ function handleBlockFormSubmit(e) {
       };
       
       store.add(block).onsuccess = function() {
-        showNotification("New block added!");
+        Helpers.showNotification("New block added!");
         $("#blockForm")[0].reset();
         loadBlocks();
         updateBlockAutocomplete();
@@ -101,7 +102,7 @@ function handleBlockFormSubmit(e) {
     }
   } catch (err) {
     console.error("Database error:", err);
-    showNotification("Failed to save block. The database might be closing or unavailable. Please try again after refreshing the page.", "danger");
+    Helpers.showNotification("Failed to save block. The database might be closing or unavailable. Please try again after refreshing the page.", "danger");
   }
 }
 
@@ -228,26 +229,30 @@ function editBlock(block) {
  * @param {number} id - The block ID to delete
  */
 function deleteBlock(id) {
-  if(confirm("Are you sure you want to delete this block?")) {
-    if (!db) {
-      showNotification("Database not available. Please refresh the page.", "danger");
-      return;
-    }
-    
-    try {
-      const transaction = db.transaction("blocks", "readwrite");
-      const store = transaction.objectStore("blocks");
+  Helpers.confirm({
+    title: "Delete Block",
+    message: "Are you sure you want to delete this block? This action cannot be undone.",
+    confirmButtonClass: "btn-danger",
+    confirmText: "Delete"
+  }).then(confirmed => {
+    if(confirmed) {
+      if (!db) {
+        Helpers.showNotification("Database not available. Please refresh the page.", "danger");
+        return;
+      }
       
-      store.delete(parseInt(id)).onsuccess = function() {
-        loadBlocks();
-        updateBlockAutocomplete();
-        showNotification("Block deleted successfully!");
-      };
-    } catch (err) {
-      console.error("Database error:", err);
-      showNotification("Failed to delete block. Please refresh the page and try again.", "danger");
+      Helpers.db.deleteById("blocks", id)
+        .then(() => {
+          loadBlocks();
+          updateBlockAutocomplete();
+          Helpers.showNotification("Block deleted successfully!");
+        })
+        .catch(error => {
+          console.error("Database error:", error);
+          Helpers.showNotification("Failed to delete block: " + error.message, "danger");
+        });
     }
-  }
+  });
 }
 
 /**
@@ -257,38 +262,30 @@ function deleteBlock(id) {
 function editBlockUniversal(blockId) {
   if (blockId) {
     if (!db) {
-      showNotification("Database not available. Please refresh the page.", "danger");
+      Helpers.showNotification("Database not available. Please refresh the page.", "danger");
       return;
     }
     
-    try {
-      const transaction = db.transaction("blocks", "readonly");
-      const store = transaction.objectStore("blocks");
-      
-      store.get(parseInt(blockId)).onsuccess = function(e) {
-        const block = e.target.result;
-        if (block) {
-          // Switch to blocks tab
-          $('#viewTabs a[href="#blocksView"]').tab('show');
-          
-          // Edit the block
-          editBlock(block);
-          
-          // Hide any block detail view that might be open
-          $("#blockDetailView").hide();
-          
-          // Scroll to the edit form
-          $('html, body').animate({
-            scrollTop: $("#blockForm").offset().top - 100
-          }, 500);
-        } else {
-          showNotification(`Block with ID ${blockId} not found`, "warning");
-        }
-      };
-    } catch (err) {
-      console.error("Database error:", err);
-      showNotification("Failed to edit block. Please refresh the page and try again.", "danger");
-    }
+    Helpers.db.getById("blocks", blockId)
+      .then(block => {
+        // Switch to blocks tab
+        $('#viewTabs a[href="#blocksView"]').tab('show');
+        
+        // Edit the block
+        editBlock(block);
+        
+        // Hide any block detail view that might be open
+        $("#blockDetailView").hide();
+        
+        // Scroll to the edit form
+        $('html, body').animate({
+          scrollTop: $("#blockForm").offset().top - 100
+        }, 500);
+      })
+      .catch(error => {
+        console.error("Database error:", error);
+        Helpers.showNotification(`Block with ID ${blockId} not found: ${error.message}`, "warning");
+      });
   }
 }
 
@@ -316,7 +313,7 @@ function showBlockDetails(block) {
     </div>
   `);
   
-  // Create a preview for the block content
+  // Create a preview for the block content using Helpers
   const additionalContent = `
     <div class="mt-3">
       <div><strong>Notes:</strong> ${block.notes || "No notes available."}</div>
@@ -330,7 +327,7 @@ function showBlockDetails(block) {
     </div>
   `;
   
-  const contentPreview = createContentPreview(block.text, {
+  const contentPreview = Helpers.createContentPreview(block.text, {
     showControls: false, // No controls needed here
     additionalFooterContent: additionalContent
   });
@@ -361,85 +358,89 @@ function showBlockDetails(block) {
     editBlockUniversal($(this).data("block-id"));
   });
   
-  // Now find paragraphs that reference this block
-  findParagraphsReferencingBlock(block.id).then(references => {
-    const refList = $("#referencingParagraphsList");
-    
-    if (references.length === 0) {
-      refList.html('<p class="text-muted">No paragraphs are referencing this block.</p>');
-      return;
-    }
-    
-    // Clear the loading indicator
-    refList.empty();
-    
-    // Create a container for references
-    const referencesContainer = $('<div class="references-container"></div>');
-    refList.append(referencesContainer);
-    
-    // Add each reference
-    references.forEach(ref => {
-      // Create reference card
-      const refCard = $(`
-        <div class="mb-3 reference-item">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <div>
-              <strong>Document:</strong> ${ref.docTitle} 
-              <br><strong>Paragraph:</strong> ${ref.paraIndex + 1}
+  // Now find paragraphs that reference this block using Helpers
+  Helpers.findParagraphsReferencingBlock(block.id)
+    .then(references => {
+      const refList = $("#referencingParagraphsList");
+      
+      if (references.length === 0) {
+        refList.html('<p class="text-muted">No paragraphs are referencing this block.</p>');
+        return;
+      }
+      
+      // Clear the loading indicator
+      refList.empty();
+      
+      // Create a container for references
+      const referencesContainer = $('<div class="references-container"></div>');
+      refList.append(referencesContainer);
+      
+      // Add each reference
+      references.forEach(ref => {
+        // Create reference card
+        const refCard = $(`
+          <div class="mb-3 reference-item">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div>
+                <strong>Document:</strong> ${ref.docTitle} 
+                <br><strong>Paragraph:</strong> ${ref.paraIndex + 1}
+              </div>
+              <button class="btn btn-sm btn-outline-primary view-document-btn" 
+                      data-doc-id="${ref.docId}" data-para-index="${ref.paraIndex}">
+                <i class="fas fa-eye"></i> View
+              </button>
             </div>
-            <button class="btn btn-sm btn-outline-primary view-document-btn" 
-                    data-doc-id="${ref.docId}" data-para-index="${ref.paraIndex}">
-              <i class="fas fa-eye"></i> View
-            </button>
           </div>
-        </div>
-      `);
-      
-      // Create preview for the paragraph content
-      const paragraphPreview = createContentPreview(ref.content, {
-        showControls: false,
-        containerClass: "paragraph-reference-preview"
-      });
-      
-      // Add the preview to the card
-      refCard.append(paragraphPreview);
-      
-      // Add the card to the container
-      referencesContainer.append(refCard);
-      
-      // Add click handler for view button
-      refCard.find(".view-document-btn").click(function() {
-        const docId = $(this).data("doc-id");
-        const paraIndex = $(this).data("para-index");
+        `);
         
-        // Load and display the document
-        fetchDocumentById(docId).then(doc => {
-          if (doc) {
-            previewDocument(doc);
-            $("#blockDetailView").hide();
-            // Switch to the documents tab
-            $('#viewTabs a[href="#documentsView"]').tab('show');
-            
-            // Highlight the referenced paragraph
-            setTimeout(() => {
-              const paraElement = $("#docPreviewContent .paragraph-container").eq(paraIndex);
-              if (paraElement.length) {
-                paraElement.addClass("highlight-paragraph");
-                $('html, body').animate({
-                  scrollTop: paraElement.offset().top - 100
+        // Create preview for the paragraph content
+        const paragraphPreview = Helpers.createContentPreview(ref.content, {
+          showControls: false,
+          containerClass: "paragraph-reference-preview"
+        });
+        
+        // Add the preview to the card
+        refCard.append(paragraphPreview);
+        
+        // Add the card to the container
+        referencesContainer.append(refCard);
+        
+        // Add click handler for view button
+        refCard.find(".view-document-btn").click(function() {
+          const docId = $(this).data("doc-id");
+          const paraIndex = $(this).data("para-index");
+          
+          // Load and display the document
+          Helpers.getById("documents", docId)
+            .then(doc => {
+              if (doc) {
+                previewDocument(doc);
+                $("#blockDetailView").hide();
+                // Switch to the documents tab
+                $('#viewTabs a[href="#documentsView"]').tab('show');
+                
+                // Highlight the referenced paragraph
+                setTimeout(() => {
+                  const paraElement = $("#docPreviewContent .paragraph-container").eq(paraIndex);
+                  if (paraElement.length) {
+                    paraElement.addClass("highlight-paragraph");
+                    $('html, body').animate({
+                      scrollTop: paraElement.offset().top - 100
+                    }, 500);
+                    setTimeout(() => paraElement.removeClass("highlight-paragraph"), 120000);
+                  }
                 }, 500);
-                setTimeout(() => paraElement.removeClass("highlight-paragraph"), 120000);
               }
-            }, 500);
-          }
-        }).catch(error => {
-          console.error("Error fetching document:", error);
-          showNotification("Error loading document: " + error.message, "danger");
+            })
+            .catch(error => {
+              console.error("Error fetching document:", error);
+              Helpers.showNotification("Error loading document: " + error.message, "danger");
+            });
         });
       });
+    })
+    .catch(error => {
+      console.error("Error finding referencing paragraphs:", error);
+      $("#referencingParagraphsList").html('<p class="text-danger">Error loading references: ' + error.message + '</p>');
     });
-  }).catch(error => {
-    console.error("Error finding referencing paragraphs:", error);
-    $("#referencingParagraphsList").html('<p class="text-danger">Error loading references: ' + error.message + '</p>');
-  });
 }
