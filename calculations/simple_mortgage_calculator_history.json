@@ -1,0 +1,242 @@
+{
+  "calculation": {
+    "id": 1,
+    "title": "Simple Mortgage Calculator",
+    "description": "",
+    "type": "standard",
+    "resultUnit": ""
+  },
+  "history": [
+    {
+      "timestamp": "2025-04-10T15:58:50.062Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:53:59.950Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:52:15.148Z",
+      "result": 42,
+      "formattedResult": "42.00",
+      "parameters": {
+        "a": 12,
+        "b": 30,
+        "c": 1
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:52:13.100Z",
+      "result": 12,
+      "formattedResult": "12.00",
+      "parameters": {
+        "a": 12,
+        "b": 30,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:52:10.333Z",
+      "result": 12,
+      "formattedResult": "12.00",
+      "parameters": {
+        "a": 12,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:52:03.543Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:41:17.859Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:41:14.131Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:41:12.846Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:41:10.946Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:41:05.478Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:41:04.055Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:40:59.169Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:40:57.963Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:40:53.446Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:40:51.629Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:40:50.230Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:40:49.303Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:37:02.433Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:36:52.361Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:36:51.145Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:36:48.453Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    },
+    {
+      "timestamp": "2025-04-10T15:36:46.987Z",
+      "result": 0,
+      "formattedResult": "0.00",
+      "parameters": {
+        "a": 0,
+        "b": 0,
+        "c": 0
+      }
+    }
+  ],
+  "exportDate": "2025-04-10T15:58:54.642Z"
+}

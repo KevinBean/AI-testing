@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Markdown Note System</title>
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <!-- jQuery UI CSS -->
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- Marked.js for Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Mermaid -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({ startOnLoad: false });
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h4>Markdown Note System</h4>
+
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs sticky-top bg-white" id="viewTabs" role="tablist" style="z-index: 1030;">
+      <li class="nav-item">
+        <a class="nav-link" id="dashboard-tab" data-toggle="tab" href="#dashboardView" role="tab">
+          <i class="fas fa-home"></i> Dashboard
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link active" id="blocks-tab" data-toggle="tab" href="#blocksView" role="tab">
+          <i class="fas fa-cube"></i> Blocks
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="references-tab" data-toggle="tab" href="#referencesView" role="tab">
+          <i class="fas fa-bookmark"></i> References
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="documents-tab" data-toggle="tab" href="#documentsView" role="tab">
+          <i class="fas fa-file-alt"></i> Documents
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="collections-tab" data-toggle="tab" href="#collectionsView" role="tab">
+          <i class="fas fa-folder"></i> Collections
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="actions-tab" data-toggle="tab" href="#actionsView" role="tab">
+          <i class="fas fa-robot"></i> Actions
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="workflows-tab" data-toggle="tab" href="#workflowsView" role="tab">
+          <i class="fas fa-cogs"></i> Workflows
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" id="settings-tab" data-toggle="tab" href="#settingsView" role="tab">
+          <i class="fas fa-cog"></i> Settings
+        </a>
+      </li>
+    </ul>
+
+    <div class="tab-content">
+      <!-- Blocks View -->
+      <div class="tab-pane fade show active" id="blocksView" role="tabpanel">
+        <div class="row">
+          <div class="col-md-3">
+            <!-- Add New Block -->
+            <div class="mb-2">
+              <button id="addBlockBtn" class="btn btn-primary btn-block mt-3">Add New Block</button>
+            </div>
+            <!-- Blocks Search-->
+            <div class="mb-2">
+              <input type="text" id="blockSearch" class="form-control" placeholder="Search blocks...">
+              <small class="form-text text-muted">Search by content, tags, or reference ID</small>
+            </div>
+            <!-- Blocks List -->
+            <div class="section-title">Saved Blocks <small>(Click on Edit to modify a block)</small></div>
+            <ul id="blockList" class="list-group"></ul>
+          </div>
+          
+          <div class="col-md-9">
+            <!-- Middle column (preview) -->
+            <div class="row-md-3">
+              <!-- Block Details View Container -->
+              <div id="blockDetailView"></div>
+            </div>
+            <!-- Middle column (editor) -->
+            <div class="row-md-3">
+              <div class="card mb-4">
+                <div class="card-header">Block Management</div>
+                <div class="card-body">
+                  <div class="help-tip">
+                    <p><strong>What are Blocks?</strong> Blocks are reusable pieces of technical content written in Markdown that can be organized into references and referenced in documents.</p>
+                  </div>
+                  <form id="blockForm">
+                    <div class="form-group">
+                      <label for="blockTitle" class="required-field">Block Title</label>
+                      <a href="#" data-toggle="tooltip" title="A short descriptive title for this block"><i class="fas fa-question-circle"></i></a>
+                      <input type="text" id="blockTitle" class="form-control" placeholder="Enter block title" required>
+                    </div>
+                    <div class="form-group">
+                      <label for="blockText" class="required-field">Block Text (Markdown)</label>
+                      <a href="#" data-toggle="tooltip" title="Use Markdown formatting: **bold**, *italic*, etc."><i class="fas fa-question-circle"></i></a>
+                      <!-- Toolbar for Markdown insertion -->
+                      <div class="btn-group mb-2" id="blockTextToolbar">
+                        <button type="button" class="btn btn-light insert-bold">Bold</button>
+                        <button type="button" class="btn btn-light insert-italic">Italic</button>
+                        <button type="button" class="btn btn-light insert-equation">Equation</button>
+                        <button type="button" class="btn btn-light insert-mermaid">Mermaid</button>
+                        <button type="button" class="btn btn-light toggle-preview">Toggle Preview</button>
+                      </div>
+                      <!-- Textarea for editing -->
+                      <textarea id="blockText" class="form-control docParagraph" rows="6" placeholder="Enter block text in Markdown" required></textarea>
+                      <!-- A container for preview (will be created dynamically, if desired) -->
+                      <div id="blockTextPreview" class="border p-2 mt-2" style="display:none;"></div>
+                    </div>
+                    <div class="form-group">
+                      <label for="blockNotes">Notes</label>
+                      <a href="#" data-toggle="tooltip" title="Private notes for this block (not included in exports/references)"><i class="fas fa-question-circle"></i></a>
+                      <textarea id="blockNotes" class="form-control" rows="2" placeholder="Enter optional notes about this block"></textarea>
+                    </div>
+                    <div class="row">
+                      <div class="col-md-8">
+                        <label for="blockTags">Tags</label>
+                        <a href="#" data-toggle="tooltip" title="Separate tags with commas to help with searching"><i class="fas fa-question-circle"></i></a>
+                        <input type="text" id="blockTags" class="form-control" placeholder="power, safety">
+                      </div>
+                      <div class="col-md-4">
+                        <label for="blockReference" class="required-field">Reference (ID)</label>
+                        <a href="#" data-toggle="tooltip" title="Use the autocomplete to select a valid reference"><i class="fas fa-question-circle"></i></a>
+                        <input type="text" id="blockReference" class="form-control" placeholder="Select a reference" required>
+                      </div>
+                    </div>
+                    <div class="row mt-3">
+                      <div class="col-md-8">
+                        <label>Reference Levels (L1–L6)</label>
+                        <a href="#" data-toggle="tooltip" title="Enter numbers to define the block's position in the reference hierarchy"><i class="fas fa-question-circle"></i></a>
+                        <div class="form-row">
+                          <div class="col-2"><input type="number" id="blockLevel1" class="form-control" placeholder="L1"></div>
+                          <div class="col-2"><input type="number" id="blockLevel2" class="form-control" placeholder="L2"></div>
+                          <div class="col-2"><input type="number" id="blockLevel3" class="form-control" placeholder="L3"></div>
+                          <div class="col-2"><input type="number" id="blockLevel4" class="form-control" placeholder="L4"></div>
+                          <div class="col-2"><input type="number" id="blockLevel5" class="form-control" placeholder="L5"></div>
+                          <div class="col-2"><input type="number" id="blockLevel6" class="form-control" placeholder="L6"></div>
+                        </div>
+                      </div>
+                      <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary btn-block">Add Block</button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- references View -->
+      <div class="tab-pane fade" id="referencesView" role="tabpanel">
+        <div class="row">
+          <div class="col-md-3">
+            <div class="mb-2">
+              <button id="addReferenceBtn" class="btn btn-primary btn-block">Add New Reference</button>
+            </div>
+            <div class="mb-2">
+              <input type="text" id="refSearch" class="form-control" placeholder="Search references...">
+              <small class="form-text text-muted">Click on a reference to view all its blocks</small>
+            </div>
+            <div class="section-title">Saved References</div>
+            <ul id="referenceList" class="list-group mb-3"></ul>
+          </div>
+          <div class="col-md-9">
+            <div class="row-md-3">
+              <div id="referenceCombinedView"></div>
+            </div>
+            <div class="row-md-3">
+              <div class="card mb-4">
+                <div class="card-header">Reference Metadata Management</div>
+                <div class="card-body">
+                  <div class="help-tip">
+                    <p><strong>What are References?</strong> References are citations to references, papers, reports, or other documents. First create a reference, then add blocks to it.</p>
+                  </div>
+                  <form id="referenceForm" class="mb-3">
+                    <div class="form-row">
+                      <div class="form-group col-md-6">
+                        <label for="refId" class="required-field">Reference ID</label>
+                        <a href="#" data-toggle="tooltip" title="Use a unique identifier for this reference"><i class="fas fa-question-circle"></i></a>
+                        <input type="text" id="refId" class="form-control" placeholder="Unique ID" required>
+                      </div>
+                      <div class="form-group col-md-6">
+                        <label for="refType" class="required-field">Reference Type</label>
+                        <select id="refType" class="form-control" required>
+                          <option value="">Select Type...</option>
+                          <option value="standard">Standard</option>
+                          <option value="paper">Paper</option>
+                          <option value="report">Report</option>
+                          <option value="webpage">Web Page</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div class="form-group col-md-12">
+                        <label for="refName" class="required-field">Title</label>
+                        <input type="text" id="refName" class="form-control" placeholder="Reference Title" required>
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div class="form-group col-md-6">
+                        <label for="refAuthor">Author(s)</label>
+                        <input type="text" id="refAuthor" class="form-control" placeholder="Author names">
+                      </div>
+                      <div class="form-group col-md-3">
+                        <label for="refYear">Year</label>
+                        <input type="number" id="refYear" class="form-control" placeholder="Publication year">
+                      </div>
+                      <div class="form-group col-md-3">
+                        <label for="refVersion">Version/Edition</label>
+                        <input type="text" id="refVersion" class="form-control" placeholder="Version">
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div class="form-group col-md-12">
+                        <label for="refUrl">URL</label>
+                        <input type="url" id="refUrl" class="form-control" placeholder="https://example.com">
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label for="refDesc">Description</label>
+                      <textarea id="refDesc" class="form-control" placeholder="Description" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                      <button type="submit" class="btn btn-primary">Add Reference</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Documents View -->
+      <div class="tab-pane fade" id="documentsView" role="tabpanel">
+        <div class="row">
+          <div class="col-md-3">
+            <div class="mb-2">
+              <button id="addDocumentBtn" class="btn btn-primary btn-block">Add New Document</button>
+            </div>
+            <div class="mb-3">
+              <input type="text" id="docSearch" class="form-control" placeholder="Search documents...">
+              <small class="form-text text-muted">Click on a document to preview it</small>
+            </div>
+            <div class="section-title">Saved Documents</div>
+            <ul id="docList" class="list-group"></ul>
+          </div>
+          <div class="col-md-9">
+            <div class="row-md-3">
+              <div id="docPreviewContent" class="card"></div>
+              <div id="documentReferencesList" class="card"></div>
+            </div>
+            <div class="row-md-4">
+              <div class="card mb-4">
+                <div class="card-header">Document Creation</div>
+                <div class="card-body">
+                  <div class="help-tip">
+                    <p><strong>What are Documents?</strong> Documents consist of paragraphs written in Markdown. You can reference blocks from your library in each paragraph.</p>
+                  </div>
+                  <form id="documentForm">
+                    <div class="form-group">
+                      <label for="docTitle" class="required-field">Document Title</label>
+                      <input type="text" id="docTitle" class="form-control" placeholder="Document Title" required>
+                    </div>
+                    <div class="section-title">Paragraphs <small>(Drag to reorder)</small></div>
+                    <div id="paragraphContainer" class="mb-3">
+                      <!-- Paragraph blocks added dynamically -->
+                    </div>
+                    <div class="btn-group mb-3">
+                      <button type="button" id="addParagraphButton" class="btn btn-secondary">Add Paragraph</button>
+                      <button type="button" id="livePreviewBtn" class="btn btn-info">Live Preview</button>
+                      <button type="submit" class="btn btn-success">Save Document</button>
+                    </div>
+                    <div class="help-tip">
+                      <p><strong>Tips:</strong> Use the autocomplete to reference blocks by ID. Drag paragraphs to reorder them.</p>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Collections View -->
+      <div class="tab-pane fade" id="collectionsView" role="tabpanel">
+        <div class="row">
+          <div class="col-md-3">
+            <div class="mb-2">
+              <button id="addCollectionBtn" class="btn btn-primary btn-block mt-3">Add New Collection</button>
+            </div>
+            <div class="mb-2">
+              <input type="text" id="collectionSearch" class="form-control" placeholder="Search collections...">
+              <small class="form-text text-muted">Search by name or description</small>
+            </div>
+            <div class="section-title">Saved Collections</div>
+            <ul id="collectionList" class="list-group"></ul>
+          </div>
+          <div class="col-md-9">
+            <div class="row-md-5">
+              <div id="collectionPreview" class="card mb-4">
+              </div>
+            </div>
+            
+            <div class="row-md-4">
+              <div class="card mb-4">
+                <div class="card-header">Collection Management</div>
+                <div class="card-body">
+                  <div class="help-tip mb-3">
+                    <p><strong>What are Collections?</strong> Collections are custom groups of blocks and documents that you can organize for specific purposes or projects.</p>
+                  </div>
+                  <form id="collectionForm">
+                    <div class="form-group">
+                      <label for="collectionName" class="required-field">Collection Name</label>
+                      <input type="text" class="form-control" id="collectionName" required>
+                    </div>
+                    <div class="form-group">
+                      <label for="collectionDesc">Description</label>
+                      <textarea class="form-control" id="collectionDesc" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                      <label for="collectionTags">Tags</label>
+                      <input type="text" class="form-control" id="collectionTags" placeholder="comma, separated, tags">
+                    </div>
+                    <div class="form-group">
+                      <label>Collection Items</label>
+                      <div id="collectionItems" class="border rounded p-2 mb-2">
+                        <p class="text-muted text-center mb-0">No items added yet</p>
+                      </div>
+                      <div class="btn-group">
+                        <button type="button" class="btn btn-outline-secondary" id="addBlockToCollection">
+                          <i class="fas fa-plus"></i> Add Block
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="addDocToCollection">
+                          <i class="fas fa-plus"></i> Add Document
+                        </button>
+                      </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Collection</button>
+                    <button type="button" class="btn btn-secondary" id="cancelCollectionBtn">Clear</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+<!-- Enhanced Dashboard View -->
+<div class="tab-pane fade" id="dashboardView" role="tabpanel">
+  <!-- Welcome banner with introduction -->
+  <div class="jumbotron mb-4 dashboard-jumbotron">
+    <h2>Welcome to Markdown Note System</h2>
+    <p class="lead">Your integrated environment for organizing technical content with the power of AI</p>
+    <p>Organize blocks of content, create references, build documents, and automate workflows</p>
+    <button class="btn btn-info" data-toggle="modal" data-target="#helpModal"><i class="fas fa-question-circle"></i> Help Guide</button>
+  </div>
+
+  <div class="row mb-4">
+    <!-- Universal Search -->
+    <div class="col-md-7">
+      <div class="card shadow-sm universal-search-container">
+        <div class="card-header bg-transparent border-0">
+          <h5><i class="fas fa-search"></i> Universal Search</h5>
+        </div>
+        <div class="card-body">
+          <div class="input-group mb-3">
+            <input type="text" id="universalSearch" class="form-control form-control-lg universal-search-input" placeholder="Search across all content...">
+            <div class="input-group-append">
+              <select class="form-control universal-search-scope" id="searchScope">
+                <option value="all">All Content</option>
+                <option value="blocks">Blocks</option>
+                <option value="documents">Documents</option>
+                <option value="references">References</option>
+                <option value="tags">Tags</option>
+              </select>
+              <button class="btn btn-primary universal-search-btn" id="universalSearchBtn">
+                <i class="fas fa-search"></i> Search
+              </button>
+            </div>
+          </div>
+          <small class="text-muted">Search all content in the system by keywords, tags, or references</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="col-md-5">
+      <div class="card shadow-sm">
+        <div class="card-header bg-transparent stats-card-header">
+          <h5><i class="fas fa-chart-pie"></i> System Overview</h5>
+        </div>
+        <div class="card-body">
+          <div class="row text-center">
+            <div class="col-3">
+              <div class="stats-card">
+                <i class="fas fa-cube stats-card-icon text-primary"></i>
+                <h3 id="blocksCount">0</h3>
+                <p>Blocks</p>
+              </div>
+            </div>
+            <div class="col-3">
+              <div class="stats-card">
+                <i class="fas fa-file-alt stats-card-icon text-success"></i>
+                <h3 id="documentsCount">0</h3>
+                <p>Documents</p>
+              </div>
+            </div>
+            <div class="col-3">
+              <div class="stats-card">
+                <i class="fas fa-bookmark stats-card-icon text-warning"></i>
+                <h3 id="referencesCount">0</h3>
+                <p>References</p>
+              </div>
+            </div>
+            <div class="col-3">
+              <div class="stats-card">
+                <i class="fas fa-tags stats-card-icon text-info"></i>
+                <h3 id="tagsCount">0</h3>
+                <p>Tags</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mb-4">
+    <!-- Quick Access -->
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-header bg-transparent">
+          <h5><i class="fas fa-bolt"></i> Quick Actions</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <button class="btn btn-block quick-action-btn primary" id="quickAddBlock">
+                <span class="icon"><i class="fas fa-cube"></i></span>
+                <span class="text">Add New Block</span>
+              </button>
+              
+              <button class="btn btn-block quick-action-btn success" id="quickAddDocument">
+                <span class="icon"><i class="fas fa-file-alt"></i></span>
+                <span class="text">Create Document</span>
+              </button>
+              
+              <button class="btn btn-block quick-action-btn warning" id="quickAddReference">
+                <span class="icon"><i class="fas fa-bookmark"></i></span>
+                <span class="text">Add Reference</span>
+              </button>
+            </div>
+            <div class="col-md-6">
+              <button class="btn btn-block quick-action-btn info" id="quickAddAction">
+                <span class="icon"><i class="fas fa-robot"></i></span>
+                <span class="text">Create Action</span>
+              </button>
+              
+              <button class="btn btn-block quick-action-btn secondary" id="quickAddWorkflow">
+                <span class="icon"><i class="fas fa-cogs"></i></span>
+                <span class="text">Create Workflow</span>
+              </button>
+              
+              <button class="btn btn-block quick-action-btn danger" id="quickExportData">
+                <span class="icon"><i class="fas fa-download"></i></span>
+                <span class="text">Export Data</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recently Accessed -->
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-header bg-transparent">
+          <h5><i class="fas fa-history"></i> Recent Activity</h5>
+        </div>
+        <div class="card-body p-0">
+          <ul class="list-group list-group-flush" id="recentActivityList">
+            <li class="list-group-item text-muted text-center">No recent activity to show</li>
+            <!-- Recent items will be populated here dynamically -->
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tags Content (Moved from the original Tags view) -->
+  <div class="row">
+    <div class="col-md-12">
+      <div class="card shadow-sm">
+        <div class="card-header bg-transparent">
+          <h5><i class="fas fa-tags"></i> Tag Management</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3">
+              <div class="input-group mb-3">
+                <input type="text" id="tagSearch" class="form-control" placeholder="Search tags...">
+                <div class="input-group-append">
+                  <button class="btn btn-primary" id="searchTagBtn">Search</button>
+                </div>
+              </div>
+
+              <!-- Tag Tree -->
+              <div id="tagTreeContainer" class="mb-4"></div>
+              
+              <h6 class="font-weight-bold border-bottom pb-2">Popular Tags</h6>
+              <div id="tagCloud" class="mb-4"></div>
+            </div>
+            
+            <div class="col-md-9">
+              <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <span>Content Tagged with: <span id="selectedTagName" class="font-weight-bold">All Tags</span></span>
+                  <span class="badge badge-primary badge-pill" id="taggedItemCount">0</span>
+                </div>
+                <ul class="nav nav-tabs" id="tagContentTabs" role="tablist">
+                  <li class="nav-item">
+                    <a class="nav-link active" id="tag-blocks-tab" data-toggle="tab" href="#tagBlocksContent" role="tab">
+                      <i class="fas fa-cube"></i> Blocks
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" id="tag-documents-tab" data-toggle="tab" href="#tagDocumentsContent" role="tab">
+                      <i class="fas fa-file-alt"></i> Documents
+                    </a>
+                  </li>
+                </ul>
+                <div class="tab-content border border-top-0 p-3">
+                  <div class="tab-pane fade show active" id="tagBlocksContent" role="tabpanel">
+                    <div id="taggedBlocksList"></div>
+                  </div>
+                  <div class="tab-pane fade" id="tagDocumentsContent" role="tabpanel">
+                    <div id="taggedDocumentsList"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+      <!-- Actions View -->
+      <div class="tab-pane fade" id="actionsView" role="tabpanel">
+        <div class="row">
+          <div class="col-md-3">
+            <div class="mb-2">
+              <button id="addActionBtn" class="btn btn-primary btn-block mt-3">Add New Action</button>
+            </div>
+            <div class="mb-2">
+              <input type="text" id="actionSearch" class="form-control" placeholder="Search actions...">
+              <small class="form-text text-muted">Search by title, description, or tags</small>
+            </div>
+            <div class="section-title">Saved Actions <small>(Click to edit)</small></div>
+            <ul id="actionsList" class="list-group mb-3"></ul>
+          </div>
+          <div class="col-md-9">
+            <div class="row-md-5">
+              <div id="actionPreview" class="card">
+                <p class="text-muted">Select an action to preview its settings and prompt template.</p>
+              </div>
+              <div class="card">
+                <div class="card-header">Action Testing</div>
+                <div class="card-body">
+                  <div class="form-group">
+                    <label for="actionTestInput">Input Content</label>
+                    <textarea id="actionTestInput" class="form-control" rows="4" placeholder="Enter content for the action to process..."></textarea>
+                  </div>
+                  <button id="runActionBtn" class="btn btn-primary" disabled>Select Content & Run Action</button>
+                  <div id="actionResultContainer" class="mt-3">
+                    <div class="alert alert-info">Results will appear here after running the action.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="row-md-4">
+              <div class="card mb-4">
+                <div class="card-header">Action Configuration</div>
+                <div class="card-body">
+                  <div class="help-tip mb-3">
+                      <p><strong>What are Actions?</strong> Actions are AI-powered operations you can configure to process your content. Create custom prompts with specific models and settings. Learn more about available models <a href="https://platform.openai.com/docs/models" target="_blank">here</a>.</p>
+                  </div>
+                  <form id="actionForm">
+                    <div class="form-group">
+                      <label for="actionTitle" class="required-field">Title</label>
+                      <input type="text" id="actionTitle" class="form-control" placeholder="Action name" required>
+                    </div>
+                    <div class="form-group">
+                      <label for="actionDescription" class="required-field">Description (System Prompt)</label>
+                      <textarea id="actionDescription" class="form-control" rows="2" placeholder="How should this action perform?" required></textarea>
+                    </div>
+                    <div class="form-group">
+                      <label for="actionTags">Tags</label>
+                      <input type="text" id="actionTags" class="form-control" placeholder="comma, separated, tags">
+                    </div>
+                    <div class="form-row">
+                      <div class="form-group col-md-6">
+                        <label for="actionModel" class="required-field">AI Model</label>
+                        <input type="text" id="actionModel" class="form-control" list="modelOptions" placeholder="Enter or select model" required>
+                        <datalist id="modelOptions">
+                          <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                          <option value="gpt-4">GPT-4</option>
+                          <option value="gpt-4o">GPT-4o</option>
+                          <option value="gpt-4o-search-preview">GPT-4o Search Preview</option>
+                        </datalist>
+                      </div>
+                      <div class="form-group col-md-6">
+                        <label for="actionPurpose">Purpose</label>
+                        <select id="actionPurpose" class="form-control">
+                          <option value="generate">Generate Content</option>
+                          <option value="modify">Modify Content</option>
+                          <option value="analyze">Analyze Content</option>
+                          <option value="synthesize">Synthesize Content</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="form-group form-check">
+                      <input type="checkbox" class="form-check-input" id="enableWebSearch">
+                      <label class="form-check-label" for="enableWebSearch">Enable Web Search (if supported by model)</label>
+                    </div>
+
+                    <div class="form-group form-check">
+                      <input type="checkbox" class="form-check-input" id="useTools">
+                      <label class="form-check-label" for="useTools">Use Tools (functions Not Working Now)</label>
+                    </div>
+
+                    <div class="form-group" id="toolsDefinitionContainer" style="display:none;">
+                      <label for="toolsDefinition">Tools Definition (JSON)</label>
+                      <textarea id="toolsDefinition" class="form-control" rows="6" placeholder='Enter tool definitions JSON here'></textarea>
+                      <small class="form-text text-muted">Define tools as JSON objects. Example provided in documentation.</small>
+                    </div>
+
+                    <div class="form-group">
+                      <label for="actionTemperature">Temperature: <span id="tempValue">0.7</span></label>
+                      <input type="range" class="form-control-range" id="actionTemperature" min="0" max="1" step="0.1" value="0.7">
+                      <small class="form-text text-muted">
+                        Lower values (0-0.3): More focused, deterministic outputs<br>
+                        Medium values (0.4-0.7): Balanced creativity<br>
+                        Higher values (0.8-1.0): More random, creative outputs
+                      </small>
+                    </div>
+                    <div class="form-group">
+                      <label for="actionPrompt" class="required-field">Prompt Template</label>
+                      <div class="help-tip mb-2">
+                        <p>Use <code>{content}</code> as placeholder for the input content</p>
+                      </div>
+                      <textarea id="actionPrompt" class="form-control" rows="6" placeholder="Write your prompt here. Use {content} where the input should go." required></textarea>
+                    </div>
+                    <button type="submit" id="saveActionBtn" class="btn btn-primary">Save Action</button>
+                    <button type="button" id="cancelActionBtn" class="btn btn-secondary">Clear</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Workflows View -->
+      <div class="tab-pane fade" id="workflowsView" role="tabpanel">
+        <div class="row">
+          <div class="col-md-3">
+            <div class="mb-2">
+              <input type="text" id="workflowSearch" class="form-control" placeholder="Search workflows...">
+              <small class="form-text text-muted">Search by name or description</small>
+            </div>
+            <div class="section-title">Saved Workflows</div>
+            <ul id="workflowList" class="list-group"></ul>
+          </div>
+          <div class="col-md-5 preview-col">
+            <div class="card mb-4">
+              <div class="card-header">Workflow Preview</div>
+              <div class="card-body">
+                <div id="workflowPreview" class="border p-3">
+                  <p class="text-muted">Select a workflow to preview its steps and configuration.</p>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">Workflow Testing</div>
+              <div class="card-body">
+                
+                
+                <div id="workflowResultContainer" class="mt-3">
+                  <div class="alert alert-info">Results will appear here after running the workflow.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4 editor-col">
+            <div class="card mb-4">
+              <div class="card-header">Workflow Configuration</div>
+              <div class="card-body">
+                <div class="help-tip mb-3">
+                  <p><strong>What are Workflows?</strong> Workflows are sequences of actions that can be run together. Create pipelines of AI operations to process your content.</p>
+                </div>
+                <form id="workflowForm">
+                  <div class="form-group">
+                    <label for="workflowName" class="required-field">Workflow Name</label>
+                    <input type="text" class="form-control" id="workflowName" required>
+                  </div>
+                  <div class="form-group">
+                    <label for="workflowDesc">Description</label>
+                    <textarea class="form-control" id="workflowDesc" rows="2"></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label for="workflowSteps">Workflow Steps</label>
+                    <div id="workflowSteps" class="border rounded p-2 mb-2">
+                      <!-- Steps will be added here -->
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="addWorkflowStepBtn">
+                      <i class="fas fa-plus"></i> Add Step
+                    </button>
+                  </div>
+                  <button type="submit" id="saveWorkflowBtn" class="btn btn-primary">Save Workflow</button>
+                  <button type="button" id="cancelWorkflowBtn" class="btn btn-secondary">Clear</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings View -->
+      <div class="tab-pane fade" id="settingsView" role="tabpanel">
+        <div class="row">
+          <div class="col-md-10">
+            <!-- OPENAI Settings Checked -->
+            <div class="card mb-4">
+              <div class="card-header">OpenAI API Settings</div>
+              <div class="card-body">
+                <div class="help-tip">
+                  <p>Enter your OpenAI API key to enable AI actions with real responses.</p>
+                </div>
+                <form id="apiSettingsForm">
+                  <div class="form-group">
+                    <label for="apiKey">OpenAI API Key</label>
+                    <div class="input-group">
+                      <input type="password" id="apiKey" class="form-control" placeholder="sk-...">
+                    </div>
+                    <small class="form-text text-muted">Your API key is stored in your browser's local storage.</small>
+                  </div>
+                  <button type="submit" class="btn btn-primary">Save API Key</button>
+                  <button type="button" id="clearApiKey" class="btn btn-outline-danger">Clear API Key</button>
+                </form>
+                <div class="mt-3" id="apiKeyStatus"></div>
+              </div>
+            </div>
+            <!-- Import/Export Settings To be checked -->
+            <div class="card mt-4 editor-col">
+              <div class="card-header">Import / Export Data</div>
+              <div class="card-body">
+                <div class="help-tip">
+                  <p>Export your data to save a backup or import data from another instance of this application.</p>
+                </div>
+                <button id="exportBtn" class="btn btn-outline-info">Export Data</button>
+                <input type="file" id="importFile" class="ml-2">
+                <small class="form-text text-muted">Select a previously exported JSON file to import data</small>
+              </div>
+            </div>
+            <!-- Help -->
+            <div class="card mt-4">
+              <div class="card-header">Help & Documentation</div>
+              <div class="card-body">
+                <div class="help-tip">
+                  <p>Need help? Check the documentation for detailed instructions on using this system.</p>
+                </div>
+                <button id="helpBtn" class="btn btn-outline-info" data-toggle="modal" data-target="#helpModal">Open Help</button>
+              </div>
+            
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="mt-5 pt-4 text-center text-muted border-top">
+      <p><small>Markdown Note System v1.0 | <a href="#" data-toggle="modal" data-target="#helpModal">Help & Documentation</a></small></p>
+    </footer>
+  </div>
+
+  <!-- Modals -->
+<!-- Updated Help Modal HTML - Replace the existing help modal in index.html -->
+<div class="modal fade" id="helpModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Help & Documentation</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <ul class="nav nav-tabs" id="helpTabs" role="tablist">
+          <li class="nav-item">
+            <a class="nav-link active" id="getting-started-tab" data-toggle="tab" href="#gettingStarted" role="tab">Getting Started</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" id="markdown-tab" data-toggle="tab" href="#markdownHelp" role="tab">Markdown Guide</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" id="diagrams-tab" data-toggle="tab" href="#diagramsHelp" role="tab">Diagrams & Math</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" id="ai-features-tab" data-toggle="tab" href="#aiFeatures" role="tab">AI Features</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" id="faq-tab" data-toggle="tab" href="#faqHelp" role="tab">FAQ</a>
+          </li>
+        </ul>
+        
+        <div class="tab-content p-3">
+          <div class="tab-pane fade show active" id="gettingStarted" role="tabpanel">
+            <h5>Getting Started</h5>
+            <p>This system helps you manage technical content using several key components:</p>
+            <ul>
+              <li><strong>Blocks</strong> - Reusable pieces of technical content written in Markdown</li>
+              <li><strong>References</strong> - Citations to references, papers, reports, or other documents</li>
+              <li><strong>Documents</strong> - Complete documents composed of paragraphs that can reference your blocks</li>
+              <li><strong>Collections</strong> - Custom groups of blocks and documents organized for specific purposes</li>
+              <li><strong>Actions</strong> - AI-powered operations configured to process your content</li>
+              <li><strong>Workflows</strong> - Sequences of actions that can be run together</li>
+            </ul>
+
+            <h5>Workflow Example</h5>
+            <ol>
+              <li>Create references in the References tab</li>
+              <li>Create blocks in the Blocks tab and associate them with references</li>
+              <li>Create documents that reference your blocks</li>
+              <li>Set up AI-powered actions to analyze or transform your content</li>
+              <li>Build workflows to automate sequences of actions</li>
+            </ol>
+            
+            <div class="alert alert-info">
+              <strong>Tip:</strong> Use the Dashboard to quickly search across all content, access common functions, and view system statistics.
+            </div>
+          </div>
+          
+          <div class="tab-pane fade" id="markdownHelp" role="tabpanel">
+            <h5>Markdown Guide</h5>
+            <p>This system uses Markdown formatting:</p>
+            
+            <div class="row">
+              <div class="col-md-6">
+                <h6>Basic Formatting</h6>
+                <table class="table table-sm">
+                  <tr>
+                    <td><code>**bold**</code></td>
+                    <td><strong>bold</strong></td>
+                  </tr>
+                  <tr>
+                    <td><code>*italic*</code></td>
+                    <td><em>italic</em></td>
+                  </tr>
+                  <tr>
+                    <td><code># Heading 1</code></td>
+                    <td><h1 style="font-size: 1.5rem;">Heading 1</h1></td>
+                  </tr>
+                  <tr>
+                    <td><code>## Heading 2</code></td>
+                    <td><h2 style="font-size: 1.4rem;">Heading 2</h2></td>
+                  </tr>
+                  <tr>
+                    <td><code>[link text](URL)</code></td>
+                    <td><a href="#">link text</a></td>
+                  </tr>
+                </table>
+              </div>
+              
+              <div class="col-md-6">
+                <h6>Lists</h6>
+                <table class="table table-sm">
+                  <tr>
+                    <td>
+<pre>- Item 1
+- Item 2
+  - Subitem</pre>
+                    </td>
+                    <td>
+                      <ul>
+                        <li>Item 1</li>
+                        <li>Item 2
+                          <ul>
+                            <li>Subitem</li>
+                          </ul>
+                        </li>
+                      </ul>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+<pre>1. First
+2. Second</pre>
+                    </td>
+                    <td>
+                      <ol>
+                        <li>First</li>
+                        <li>Second</li>
+                      </ol>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+            
+            <h6>Advanced Features</h6>
+            <table class="table table-sm">
+              <tr>
+                <td>Code Blocks</td>
+                <td>
+                  <pre>```language
+code goes here
+```</pre>
+                </td>
+              </tr>
+              <tr>
+                <td>Tables</td>
+                <td>
+<pre>| Header 1 | Header 2 |
+|----------|----------|
+| Cell 1   | Cell 2   |</pre>
+                </td>
+              </tr>
+              <tr>
+                <td>Blockquotes</td>
+                <td>
+                  <pre>> This is a blockquote</pre>
+                </td>
+              </tr>
+            </table>
+          </div>
+          
+          <div class="tab-pane fade" id="diagramsHelp" role="tabpanel">
+            <h5>Diagrams & Math Support</h5>
+            
+            <h6>Mermaid Diagrams</h6>
+            <p>You can create diagrams using Mermaid syntax:</p>
+<pre>```mermaid
+graph TD;
+  A[Start] --> B{Is it working?};
+  B -->|Yes| C[Celebrate!];
+  B -->|No| D[Fix it];
+```</pre>
+
+            <p>Example Output:</p>
+            <div class="mermaid">
+graph TD;
+  A[Start] --> B{Is it working?};
+  B -->|Yes| C[Celebrate!];
+  B -->|No| D[Fix it];
+</div>
+
+            <h6>Math Equations (KaTeX)</h6>
+            <p>Use <code>$...$</code> for inline math and <code>$$...$$</code> for display math:</p>
+            
+            <p>Inline Example: <code>$E = mc^2$</code></p>
+            
+            <p>Block Example:</p>
+<pre>$$
+\int_0^\infty x^2 dx = \frac{1}{3}x^3\Big|_0^\infty
+$$</pre>
+
+            <div class="alert alert-info">
+              <strong>Tip:</strong> Use the toolbar buttons in the editor to easily insert diagrams and equations.
+            </div>
+          </div>
+          
+          <div class="tab-pane fade" id="aiFeatures" role="tabpanel">
+            <h5>AI Features</h5>
+            
+            <h6>Actions</h6>
+            <p>Actions are AI-powered operations you can configure to process your content:</p>
+            <ul>
+              <li>Generate new content based on prompts</li>
+              <li>Analyze or extract information from blocks and documents</li>
+              <li>Modify or transform existing content</li>
+              <li>Synthesize information from multiple sources</li>
+            </ul>
+            
+            <h6>Workflows</h6>
+            <p>Workflows are sequences of actions that can be run together:</p>
+            <ul>
+              <li>Chain multiple AI operations together</li>
+              <li>Pass results from one action to the next</li>
+              <li>Create complex multi-step processes</li>
+              <li>Save configurations for repeated use</li>
+            </ul>
+            
+            <div class="alert alert-warning">
+              <strong>Note:</strong> To use AI features, you need to configure your OpenAI API key in the Settings tab.
+            </div>
+          </div>
+          
+          <div class="tab-pane fade" id="faqHelp" role="tabpanel">
+            <h5>Frequently Asked Questions</h5>
+            
+            <div class="accordion" id="faqAccordion">
+              <div class="card">
+                <div class="card-header" id="faq1">
+                  <h2 class="mb-0">
+                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#faqAnswer1">
+                      How is data stored?
+                    </button>
+                  </h2>
+                </div>
+                <div id="faqAnswer1" class="collapse" data-parent="#faqAccordion">
+                  <div class="card-body">
+                    All data is stored locally in your browser using IndexedDB. No data is sent to any server unless you use AI features which require API calls to OpenAI.
+                  </div>
+                </div>
+              </div>
+              
+              <div class="card">
+                <div class="card-header" id="faq2">
+                  <h2 class="mb-0">
+                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#faqAnswer2">
+                      How do I back up my data?
+                    </button>
+                  </h2>
+                </div>
+                <div id="faqAnswer2" class="collapse" data-parent="#faqAccordion">
+                  <div class="card-body">
+                    Use the Export Data function in the Settings tab to save a JSON file of all your content. You can import this file later to restore your data.
+                  </div>
+                </div>
+              </div>
+              
+              <div class="card">
+                <div class="card-header" id="faq3">
+                  <h2 class="mb-0">
+                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#faqAnswer3">
+                      What's the difference between Blocks and Documents?
+                    </button>
+                  </h2>
+                </div>
+                <div id="faqAnswer3" class="collapse" data-parent="#faqAccordion">
+                  <div class="card-body">
+                    Blocks are reusable pieces of content that can be referenced by multiple documents. They are organized by references. Documents are composed of paragraphs that can include references to blocks.
+                  </div>
+                </div>
+              </div>
+              
+              <div class="card">
+                <div class="card-header" id="faq4">
+                  <h2 class="mb-0">
+                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#faqAnswer4">
+                      What AI models are supported?
+                    </button>
+                  </h2>
+                </div>
+                <div id="faqAnswer4" class="collapse" data-parent="#faqAccordion">
+                  <div class="card-body">
+                    The system supports OpenAI models including GPT-3.5 Turbo, GPT-4, and GPT-4o. You'll need to provide your own OpenAI API key in the Settings tab to use these features.
+                  </div>
+                </div>
+              </div>
+              
+              <div class="card">
+                <div class="card-header" id="faq5">
+                  <h2 class="mb-0">
+                    <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#faqAnswer5">
+                      How do I create hierarchical tags?
+                    </button>
+                  </h2>
+                </div>
+                <div id="faqAnswer5" class="collapse" data-parent="#faqAccordion">
+                  <div class="card-body">
+                    Use slashes to create hierarchical tags (e.g., "power/cables/rating"). This will organize them in the tag tree view for easier navigation.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+  
+  <!-- Import Options Modal -->
+  <div class="modal fade" id="importOptionsModal" tabindex="-1" role="dialog" aria-labelledby="importOptionsModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="importOptionsModalLabel">Import Options</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p>Choose how to handle the imported data:</p>
+          <div class="form-group">
+            <div class="custom-control custom-radio">
+              <input type="radio" id="replaceOption" name="importOption" class="custom-control-input" value="replace" checked>
+              <label class="custom-control-label" for="replaceOption">
+                <strong>Replace</strong> - Overwrite existing entries with the same ID
+              </label>
+              <small class="form-text text-muted ml-4">Use this option if you're restoring from a backup.</small>
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="custom-control custom-radio">
+              <input type="radio" id="mergeOption" name="importOption" class="custom-control-input" value="merge">
+              <label class="custom-control-label" for="mergeOption">
+                <strong>Merge</strong> - Keep existing entries when there are conflicts
+              </label>
+              <small class="form-text text-muted ml-4">Use this option to combine data from multiple sources.</small>
+            </div>
+          </div>
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> The import process will handle <strong><span id="importItemCount">0</span></strong> items in total.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="confirmImport">Import</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content Selection Modal for Actions -->
+  <div class="modal fade" id="contentSelectionModal" tabindex="-1" role="dialog" aria-labelledby="contentSelectionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="contentSelectionModalLabel">Select Content for Action</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <div class="alert alert-info action-selection-info">
+              Please select content to process with this action.
+            </div>
+          </div>
+          
+          <ul class="nav nav-tabs" id="selectionTabs" role="tablist">
+            <li class="nav-item">
+              <a class="nav-link active" id="blocks-selection-tab" data-toggle="tab" href="#blocksSelectionTab" role="tab">Blocks</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="paragraphs-selection-tab" data-toggle="tab" href="#paragraphsSelectionTab" role="tab">Paragraphs</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="tags-selection-tab" data-toggle="tab" href="#tagsSelectionTab" role="tab">Tags</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="references-selection-tab" data-toggle="tab" href="#referencesSelectionTab" role="tab">References</a>
+            </li>
+          </ul>
+          
+          <div class="tab-content mt-3">
+            <!-- Existing Blocks Tab -->
+            <div class="tab-pane fade show active" id="blocksSelectionTab" role="tabpanel">
+              <div class="input-group mb-3">
+                <input type="text" id="blockSelectionSearch" class="form-control" placeholder="Search blocks...">
+                <div class="input-group-append">
+                  <button class="btn btn-outline-secondary" type="button" id="searchBlocksSelectionBtn">
+                    <i class="fas fa-search"></i> Search
+                  </button>
+                </div>
+              </div>
+              <div class="block-selection-list overflow-auto" style="max-height: 300px;">
+                <!-- Blocks will be loaded here -->
+                <div class="text-center py-3">
+                  <i class="fas fa-spinner fa-spin"></i> Loading blocks...
+                </div>
+              </div>
+            </div>
+            
+            <!-- Remaining tabs content... -->
+            <!-- Add other selection tabs here from the original code -->
+          </div>
+          
+          <div class="mt-3">
+            <h6>Selected items (<span id="selectedItemsCount">0</span>):</h6>
+            <div id="selectedItemsList" class="border rounded p-2" style="min-height: 60px; max-height: 120px; overflow-y: auto;">
+              <p class="text-muted text-center mb-0">No items selected</p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" id="confirmContentSelection">Apply & Run Action</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- jQuery, jQuery UI, Bootstrap JS, Popper -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.1/umd/popper.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <!-- Font Awesome for icons -->
+  <script src="https://kit.fontawesome.com/a076d05399.js"></script>
+  
+  <!-- KaTeX for math rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+  <!-- Application Scripts -->
+  <script src="js/helpers.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/modules/blocks.js"></script>
+  <script src="js/modules/references.js"></script>
+  <script src="js/modules/documents.js"></script>
+  <script src="js/modules/collections.js"></script>
+  <script src="js/modules/tags.js"></script>
+  <script src="js/modules/dashboard.js"></script>
+  <script src="js/modules/actions.js"></script>
+  <script src="js/modules/workflows.js"></script>
+  <script src="js/modules/settings.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
