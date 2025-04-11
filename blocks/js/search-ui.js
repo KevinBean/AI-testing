@@ -4,6 +4,7 @@
  */
 
 const SearchUI = (function() {
+  console.log("Initializing SearchUI module");
   // Private properties
   let currentSearchQuery = '';
   let currentSearchOptions = {
@@ -169,6 +170,8 @@ const SearchUI = (function() {
    * @param {Object} options - Search options
    */
   async function performSearch(query, options = {}) {
+    console.log("Performing search:", query, options);
+    
     if (!query) return;
     
     // Store current search for potential refinement
@@ -184,8 +187,35 @@ const SearchUI = (function() {
     `);
     
     try {
+      // Check if SearchHelper is available
+      if (typeof SearchHelper === 'undefined') {
+        $('#searchResultsContainer').html(`
+          <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            SearchHelper module is not available!
+          </div>
+        `);
+        console.error("SearchHelper is not defined. Make sure search-helper.js is loaded properly.");
+        return;
+      }
+      
+      // Check if window.db is available
+      if (!window.db) {
+        $('#searchResultsContainer').html(`
+          <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            Database is not available!
+          </div>
+        `);
+        console.error("Database is not initialized. Make sure db.js is loaded properly.");
+        return;
+      }
+      
+      console.log("About to call SearchHelper.search with:", query, currentSearchOptions);
+      
       // Perform the search
       const results = await SearchHelper.search(query, currentSearchOptions);
+      console.log("Search results:", results);
       
       // Count total results
       const totalResults = 

@@ -85,7 +85,9 @@ function initializeDB() {
     
     request.onsuccess = function(e) {
       db = e.target.result;
+      window.db = db; // Make db accessible globally
       console.log("Database initialized successfully");
+      window.dbInitialized = true; // Add this flag
       resolve(db);
     };
     

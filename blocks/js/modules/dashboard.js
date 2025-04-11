@@ -2031,7 +2031,7 @@ function initializeDashboardActions() {
   `);
   
   // Add the panel to the dashboard after the search card
-  actionsPanel.insertAfter($("#dashboardView .universal-search-container").closest(".row").next());
+  actionsPanel.insertAfter($("#dashboardView .universal-search-container"));
   
   // Setup event handlers
   initializeDashboardActionHandlers();

@@ -448,75 +448,70 @@
           </div>
         </div>
       </div>
+
+          <div class="card shadow-sm">
+            <div class="card-header bg-transparent">
+              <h5><i class="fas fa-bolt"></i> Quick Actions</h5>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <button class="btn btn-block quick-action-btn primary" id="quickAddBlock">
+                    <span class="icon"><i class="fas fa-cube"></i></span>
+                    <span class="text">Add New Block</span>
+                  </button>
+                  
+                  <button class="btn btn-block quick-action-btn success" id="quickAddDocument">
+                    <span class="icon"><i class="fas fa-file-alt"></i></span>
+                    <span class="text">Create Document</span>
+                  </button>
+                  
+                  <button class="btn btn-block quick-action-btn warning" id="quickAddReference">
+                    <span class="icon"><i class="fas fa-bookmark"></i></span>
+                    <span class="text">Add Reference</span>
+                  </button>
+                </div>
+                <div class="col-md-6">
+                  <button class="btn btn-block quick-action-btn info" id="quickAddAction">
+                    <span class="icon"><i class="fas fa-robot"></i></span>
+                    <span class="text">Create Action</span>
+                  </button>
+                  
+                  <button class="btn btn-block quick-action-btn secondary" id="quickAddWorkflow">
+                    <span class="icon"><i class="fas fa-cogs"></i></span>
+                    <span class="text">Create Workflow</span>
+                  </button>
+                  
+                  <button class="btn btn-block quick-action-btn danger" id="quickExportData">
+                    <span class="icon"><i class="fas fa-download"></i></span>
+                    <span class="text">Export Data</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+    
+        <!-- Recently Accessed -->
+          <div class="card shadow-sm">
+            <div class="card-header bg-transparent">
+              <h5><i class="fas fa-history"></i> Recent Activity</h5>
+            </div>
+            <div class="card-body p-0">
+              <ul class="list-group list-group-flush" id="recentActivityList">
+                <li class="list-group-item text-muted text-center">No recent activity to show</li>
+                <!-- Recent items will be populated here dynamically -->
+              </ul>
+            </div>
+          </div>
+
+
     </div>
+    
+
   </div>
 
   <!-- Dashboard AI Actions Panel HTML -->
 <!-- Add this to the dashboard section in index.html -->
-
-
-
-  <div class="row mb-4">
-    <!-- Quick Access -->
-    <div class="col-md-6">
-      <div class="card shadow-sm">
-        <div class="card-header bg-transparent">
-          <h5><i class="fas fa-bolt"></i> Quick Actions</h5>
-        </div>
-        <div class="card-body">
-          <div class="row">
-            <div class="col-md-6">
-              <button class="btn btn-block quick-action-btn primary" id="quickAddBlock">
-                <span class="icon"><i class="fas fa-cube"></i></span>
-                <span class="text">Add New Block</span>
-              </button>
-              
-              <button class="btn btn-block quick-action-btn success" id="quickAddDocument">
-                <span class="icon"><i class="fas fa-file-alt"></i></span>
-                <span class="text">Create Document</span>
-              </button>
-              
-              <button class="btn btn-block quick-action-btn warning" id="quickAddReference">
-                <span class="icon"><i class="fas fa-bookmark"></i></span>
-                <span class="text">Add Reference</span>
-              </button>
-            </div>
-            <div class="col-md-6">
-              <button class="btn btn-block quick-action-btn info" id="quickAddAction">
-                <span class="icon"><i class="fas fa-robot"></i></span>
-                <span class="text">Create Action</span>
-              </button>
-              
-              <button class="btn btn-block quick-action-btn secondary" id="quickAddWorkflow">
-                <span class="icon"><i class="fas fa-cogs"></i></span>
-                <span class="text">Create Workflow</span>
-              </button>
-              
-              <button class="btn btn-block quick-action-btn danger" id="quickExportData">
-                <span class="icon"><i class="fas fa-download"></i></span>
-                <span class="text">Export Data</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Recently Accessed -->
-    <div class="col-md-6">
-      <div class="card shadow-sm">
-        <div class="card-header bg-transparent">
-          <h5><i class="fas fa-history"></i> Recent Activity</h5>
-        </div>
-        <div class="card-body p-0">
-          <ul class="list-group list-group-flush" id="recentActivityList">
-            <li class="list-group-item text-muted text-center">No recent activity to show</li>
-            <!-- Recent items will be populated here dynamically -->
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Tags Content (Moved from the original Tags view) -->
   <div class="row">
@@ -1297,10 +1292,14 @@ $$</pre>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 
   <!-- Application Scripts -->
-  <script src="js/helpers/helpers.js"></script>
-  <script src="js/helpers/search-helper.js"></script>
-  <script src="js/render.js"></script>
   <script src="js/db.js"></script>
+  <script src="js/helpers/helpers.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/helpers/search-helper.js"></script>
+  <script src="js/search-ui.js"></script>
+  <script src="js/search-debug.js"></script>
+
+
   <script src="js/modules/blocks.js"></script>
   <script src="js/modules/references.js"></script>
   <script src="js/modules/documents.js"></script>
@@ -1310,10 +1309,7 @@ $$</pre>
   <script src="js/modules/actions.js"></script>
   <script src="js/modules/workflows.js"></script>
   <script src="js/modules/settings.js"></script>
-  <script src="js/search-ui.js"></script>
   <script src="js/main.js"></script>
-
-
 
 </body>
 </html>

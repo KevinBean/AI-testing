@@ -129,7 +129,7 @@ const SearchHelper = (function() {
     if (!item || !tokens || !tokens.length) return 0;
     
     let score = 0;
-    let hasRequiredMatch = false;
+    let hasRequiredMatch = tokens.some(t => t.operator === OPERATORS.AND) ? false : true;
     let hasExcludedMatch = false;
     
     // Process each token
@@ -189,25 +189,24 @@ const SearchHelper = (function() {
       });
       
       // Apply boolean logic
-      if (token.operator === OPERATORS.AND && !foundInAnyField) {
-        hasRequiredMatch = false;
-      } else if (token.operator === OPERATORS.NOT && foundInAnyField) {
-        hasExcludedMatch = true;
-      } else if (foundInAnyField) {
-        if (token.operator === OPERATORS.AND) {
+      if (token.operator === OPERATORS.AND) {
+        if (foundInAnyField) {
           hasRequiredMatch = true;
+          score += tokenScore;
+        } else {
+          hasRequiredMatch = false;
         }
+      } else if (token.operator === OPERATORS.NOT) {
+        if (foundInAnyField) {
+          hasExcludedMatch = true;
+        }
+      } else if (foundInAnyField) {
         score += tokenScore;
       }
     });
     
     // Apply boolean logic to final score
-    const parsedQuery = parseQuery();
-    if (parsedQuery.operator === OPERATORS.AND && !hasRequiredMatch) {
-      return 0;
-    }
-    
-    if (hasExcludedMatch) {
+    if (!hasRequiredMatch || hasExcludedMatch) {
       return 0;
     }
     
@@ -220,7 +219,15 @@ const SearchHelper = (function() {
    * @returns {Promise<Array>} - Scored search results
    */
   async function searchBlocks(query) {
-    if (!db) {
+    // Check if database is available
+    let retries = 20;
+    while (retries > 0 && !window.db) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      retries--;
+    }
+    
+    if (!window.db) {
+      console.error("Database not available after waiting");
       throw new Error("Database not initialized");
     }
     
@@ -233,8 +240,10 @@ const SearchHelper = (function() {
       const results = [];
       
       try {
-        const transaction = db.transaction("blocks", "readonly");
+        const transaction = window.db.transaction("blocks", "readonly");
         const store = transaction.objectStore("blocks");
+        
+        console.log("Searching blocks for query:", query);
         
         store.openCursor().onsuccess = function(e) {
           const cursor = e.target.result;
@@ -265,10 +274,17 @@ const SearchHelper = (function() {
           } else {
             // Sort by score (highest first)
             results.sort((a, b) => b.score - a.score);
+            console.log(`Found ${results.length} blocks matching query`, results);
             resolve(results);
           }
         };
+        
+        transaction.onerror = function(e) {
+          console.error("Error in blocks transaction:", e.target.error);
+          reject(e.target.error);
+        };
       } catch (err) {
+        console.error("Error searching blocks:", err);
         reject(err);
       }
     });
@@ -280,7 +296,9 @@ const SearchHelper = (function() {
    * @returns {Promise<Array>} - Scored search results
    */
   async function searchDocuments(query) {
-    if (!db) {
+    // Check if database is available
+    if (!window.db) {
+      console.error("Database not available for search");
       throw new Error("Database not initialized");
     }
     
@@ -293,8 +311,10 @@ const SearchHelper = (function() {
       const results = [];
       
       try {
-        const transaction = db.transaction("documents", "readonly");
+        const transaction = window.db.transaction("documents", "readonly");
         const store = transaction.objectStore("documents");
+        
+        console.log("Searching documents for query:", query);
         
         store.openCursor().onsuccess = function(e) {
           const cursor = e.target.result;
@@ -303,7 +323,7 @@ const SearchHelper = (function() {
             
             // Define field mappings for documents
             const fieldMappings = {
-              title: (item) => item.title,
+              title: (item) => item.title || '',
               content: (item) => {
                 // Combine all paragraph content
                 if (item.combinedContent) {
@@ -345,10 +365,17 @@ const SearchHelper = (function() {
           } else {
             // Sort by score (highest first)
             results.sort((a, b) => b.score - a.score);
+            console.log(`Found ${results.length} documents matching query`, results);
             resolve(results);
           }
         };
+        
+        transaction.onerror = function(e) {
+          console.error("Error in documents transaction:", e.target.error);
+          reject(e.target.error);
+        };
       } catch (err) {
+        console.error("Error searching documents:", err);
         reject(err);
       }
     });
@@ -360,7 +387,9 @@ const SearchHelper = (function() {
    * @returns {Promise<Array>} - Scored search results
    */
   async function searchReferences(query) {
-    if (!db) {
+    // Check if database is available
+    if (!window.db) {
+      console.error("Database not available for search");
       throw new Error("Database not initialized");
     }
     
@@ -373,8 +402,10 @@ const SearchHelper = (function() {
       const results = [];
       
       try {
-        const transaction = db.transaction("references", "readonly");
+        const transaction = window.db.transaction("references", "readonly");
         const store = transaction.objectStore("references");
+        
+        console.log("Searching references for query:", query);
         
         store.openCursor().onsuccess = function(e) {
           const cursor = e.target.result;
@@ -383,7 +414,7 @@ const SearchHelper = (function() {
             
             // Define field mappings for references
             const fieldMappings = {
-              title: (item) => item.name,
+              title: (item) => item.name || '',
               content: (item) => item.description || '',
               reference: (item) => item.id || '',
               tags: (item) => item.type || '',
@@ -405,10 +436,17 @@ const SearchHelper = (function() {
           } else {
             // Sort by score (highest first)
             results.sort((a, b) => b.score - a.score);
+            console.log(`Found ${results.length} references matching query`, results);
             resolve(results);
           }
         };
+        
+        transaction.onerror = function(e) {
+          console.error("Error in references transaction:", e.target.error);
+          reject(e.target.error);
+        };
       } catch (err) {
+        console.error("Error searching references:", err);
         reject(err);
       }
     });
@@ -420,11 +458,12 @@ const SearchHelper = (function() {
    * @returns {Promise<Object>} - Object with blocks and documents that have the tag
    */
   async function searchByTag(tag) {
-    if (!db || !tag) {
+    if (!window.db || !tag) {
       return { blocks: [], documents: [] };
     }
     
     const tagLower = tag.toLowerCase();
+    console.log("Searching for tag:", tagLower);
     
     return new Promise((resolve, reject) => {
       const results = {
@@ -437,7 +476,7 @@ const SearchHelper = (function() {
       
       try {
         // Search blocks with the tag
-        const blockTx = db.transaction("blocks", "readonly");
+        const blockTx = window.db.transaction("blocks", "readonly");
         const blockStore = blockTx.objectStore("blocks");
         
         blockStore.openCursor().onsuccess = function(e) {
@@ -455,13 +494,22 @@ const SearchHelper = (function() {
           } else {
             blocksDone = true;
             if (documentsDone) {
+              console.log(`Found ${results.blocks.length} blocks and ${results.documents.length} documents with tag "${tag}"`);
               resolve(results);
             }
           }
         };
         
+        blockTx.onerror = function(e) {
+          console.error("Error in block tag search:", e.target.error);
+          blocksDone = true;
+          if (documentsDone) {
+            reject(e.target.error);
+          }
+        };
+        
         // Search documents with the tag
-        const docTx = db.transaction("documents", "readonly");
+        const docTx = window.db.transaction("documents", "readonly");
         const docStore = docTx.objectStore("documents");
         
         docStore.openCursor().onsuccess = function(e) {
@@ -489,11 +537,21 @@ const SearchHelper = (function() {
           } else {
             documentsDone = true;
             if (blocksDone) {
+              console.log(`Found ${results.blocks.length} blocks and ${results.documents.length} documents with tag "${tag}"`);
               resolve(results);
             }
           }
         };
+        
+        docTx.onerror = function(e) {
+          console.error("Error in document tag search:", e.target.error);
+          documentsDone = true;
+          if (blocksDone) {
+            reject(e.target.error);
+          }
+        };
       } catch (err) {
+        console.error("Error in tag search:", err);
         reject(err);
       }
     });
@@ -597,6 +655,8 @@ const SearchHelper = (function() {
       includeContent = true,
       contextSize = 100
     } = options;
+    
+    console.log("Universal search:", query, "with options:", options);
     
     if (!query) {
       return {
@@ -743,6 +803,7 @@ const SearchHelper = (function() {
     }
     
     await Promise.all(promises);
+    console.log("Search completed, results:", results);
     return results;
   }
   
@@ -752,16 +813,17 @@ const SearchHelper = (function() {
    * @returns {Promise<Array>} - Search suggestions
    */
   async function getSearchSuggestions(partialQuery) {
-    if (!partialQuery || partialQuery.length < 2) {
+    if (!partialQuery || partialQuery.length < 2 || !window.db) {
       return [];
     }
     
+    console.log("Getting suggestions for:", partialQuery);
     const suggestions = new Set();
     const partialLower = partialQuery.toLowerCase();
     
     // Add tag suggestions
     try {
-      const transaction = db.transaction("blocks", "readonly");
+      const transaction = window.db.transaction("blocks", "readonly");
       const store = transaction.objectStore("blocks");
       
       store.openCursor().onsuccess = function(e) {

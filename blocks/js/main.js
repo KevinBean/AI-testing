@@ -55,6 +55,29 @@ $(document).ready(function() {
     console.error("Database initialization error:", error);
     showNotification("Failed to initialize database. Please refresh the page.", "danger");
   });
+
+// After a short delay to ensure DB is initialized
+setTimeout(() => {
+  console.log("Checking database availability...");
+  if (window.db) {
+    console.log("Database is available globally!");
+    try {
+      const tx = window.db.transaction("blocks", "readonly");
+      console.log("Successfully created transaction!");
+      const store = tx.objectStore("blocks");
+      console.log("Successfully accessed blocks store!");
+      const countRequest = store.count();
+      countRequest.onsuccess = function() {
+        console.log("Total blocks in database:", countRequest.result);
+      };
+    } catch (err) {
+      console.error("Error accessing database:", err);
+    }
+  } else {
+    console.error("Database is not available globally");
+  }
+}, 1000);
+
 });
 
 /**
