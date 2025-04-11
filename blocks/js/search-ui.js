@@ -653,7 +653,12 @@ const SearchUI = (function() {
    * @param {string} refId - Reference ID
    */
   function loadReferenceForEdit(refId) {
-    if (!db) return;
+    // Wait for database to be available
+if (!window.db) {
+  console.log("DEBUG: Database not available yet, will retry in 1 second");
+  setTimeout(() => loadReferenceForEdit(refId), 1000);
+  return;
+}
     
     const transaction = db.transaction("references", "readonly");
     const store = transaction.objectStore("references");

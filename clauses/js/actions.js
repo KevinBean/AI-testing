@@ -1498,7 +1498,12 @@ function saveResultAsParagraph(text) {
  * @param {Object} runData - The run data to save
  */
 function saveActionRunHistory(actionId, runData) {
-  if (!db) return;
+ // Wait for database to be available
+if (!window.db) {
+  console.log("DEBUG: Database not available yet, will retry in 1 second");
+  setTimeout(saveActionRunHistory(actionId, runData), 1000);
+  return;
+}
   
   const transaction = db.transaction("actions", "readwrite");
   const store = transaction.objectStore("actions");

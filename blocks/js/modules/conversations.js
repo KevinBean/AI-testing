@@ -56,7 +56,9 @@ console.log("DEBUG: Initializing conversations module...");
     const type = $(this).data("type");
     const id = $(this).data("id");
     const title = $(this).data("title");
-    startConversationWithContent(type, id, title);
+    const text = $(this).data("text");
+    console.log(`DEBUG: Context menu action for ${type} ${id} - ${title} with ${text}`);
+    startConversationWithContent(type, id, title, text);
   });
   
   // Load conversation list
@@ -72,7 +74,12 @@ console.log("DEBUG: Initializing conversations module...");
 function loadConversations(searchTerm = "") {
     $("#conversationList").empty();
     
-    if (!db) return;
+    // Wait for database to be available
+if (!window.db) {
+    console.log("DEBUG: Database not available yet, will retry in 1 second");
+    setTimeout(loadConversations, 1000);
+    return;
+  }
     
     const transaction = db.transaction("conversations", "readonly");
     const store = transaction.objectStore("conversations");
@@ -147,7 +154,7 @@ function startNewConversation() {
 /**
  * Start a conversation with specific content
  */
-function startConversationWithContent(contentType, contentId, contentTitle) {
+function startConversationWithContent(contentType, contentId, contentTitle, contentText) {
     console.log(`DEBUG: startConversationWithContent called with ${contentType}, ${contentId}, ${contentTitle}`);
     // Get the content
   Helpers.getById(contentType + "s", contentId).then(content => {
@@ -156,7 +163,7 @@ function startConversationWithContent(contentType, contentId, contentTitle) {
     const initialMessage = {
       id: generateMessageId(),
       sender: "user",
-      content: `I'd like to discuss this ${contentType}: ${contentTitle}`,
+      content: `I'd like to discuss this ${contentType}: ${contentTitle}. content: """${contentText}"""`,
       timestamp: new Date(),
       references: [
         {
@@ -202,7 +209,12 @@ function startConversationWithContent(contentType, contentId, contentTitle) {
  * Load an existing conversation
  */
 function loadConversation(id) {
-  if (!db) return;
+  // Wait for database to be available
+if (!window.db) {
+    console.log("DEBUG: Database not available yet, will retry in 1 second");
+    setTimeout(() => loadConversation(id), 1000);
+    return;
+  }
   
   const transaction = db.transaction("conversations", "readonly");
   const store = transaction.objectStore("conversations");

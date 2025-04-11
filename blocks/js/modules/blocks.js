@@ -205,7 +205,7 @@ function loadBlocks(searchTerm = "") {
             </a>
             <div class="dropdown-divider"></div>
             <a class="dropdown-item start-conversation" href="#" 
-              data-type="block" data-id="${block.id}" data-title="${title}">
+              data-type="block" data-id="${block.id}" data-title="${title}" data-text="${block.text}">
               <i class="fas fa-comments"></i> Start Conversation
             </a>
           </div>
@@ -335,7 +335,7 @@ function showBlockDetails(block) {
           
           <!-- ADD CONVERSATION BUTTON HERE -->
           <button class="btn btn-sm btn-info start-conversation" 
-                  data-type="block" data-id="${block.id}" data-title="${title}">
+                  data-type="block" data-id="${block.id}" data-title="${title} data-text="${block.text}">
             <i class="fas fa-comments"></i> Start Conversation
           </button>
         </div>
