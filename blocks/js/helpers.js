@@ -392,3 +392,98 @@ function handleImportConfirm() {
   
   $("#importOptionsModal").modal("hide");
 }
+
+/**
+ * Creates a reusable content preview element
+ * @param {string} content - The content to preview
+ * @param {Object} options - Configuration options
+ * @returns {jQuery} - The preview element
+ */
+function createContentPreview(content, options = {}) {
+  const {
+    showControls = true, 
+    maxHeight = null, 
+    title = "Content Preview",
+    allowCopy = true,
+    containerClass = "",
+    renderMermaidDiagrams = true,
+    additionalHeaderContent = "",
+    additionalFooterContent = "",
+    showBorder = true
+  } = options;
+  
+  const previewHtml = `
+    <div class="content-preview-container ${containerClass}">
+      ${showControls ? `
+        <div class="d-flex justify-content-between align-items-center mb-2 card-header">
+          <span class="preview-title">${title}</span>
+          ${additionalHeaderContent}
+          <div class="btn-group btn-group-sm">
+            ${allowCopy ? `
+              <button class="btn btn-sm btn-outline-primary copy-preview-btn">
+                <i class="fas fa-copy"></i> Copy
+              </button>
+            ` : ''}
+            <button class="btn btn-sm btn-outline-secondary toggle-preview-btn">
+              <i class="fas fa-eye-slash"></i> Hide
+            </button>
+          </div>
+        </div>
+      ` : ''}
+      <div class="preview-content card-body bg-light p-2 ${showBorder ? 'border rounded' : ''}" 
+           ${maxHeight ? `style="max-height: ${maxHeight}px; overflow-y: auto;"` : ''}>
+        ${renderMarkdown(content || '<em>No content available</em>')}
+      </div>
+      ${additionalFooterContent ? `
+        <div class="preview-footer mt-2">
+          ${additionalFooterContent}
+        </div>
+      ` : ''}
+    </div>
+  `;
+  
+  const previewElement = $(previewHtml);
+  
+  // Set up event handlers if controls are enabled
+  if (showControls) {
+    previewElement.find('.toggle-preview-btn').on('click', function() {
+      const contentDiv = previewElement.find('.preview-content');
+      const btn = $(this);
+      
+      if (contentDiv.is(':visible')) {
+        contentDiv.slideUp();
+        btn.html('<i class="fas fa-eye"></i> Show');
+      } else {
+        contentDiv.slideDown();
+        renderMermaidInElement(contentDiv);
+        btn.html('<i class="fas fa-eye-slash"></i> Hide');
+      }
+    });
+    
+    if (allowCopy) {
+      previewElement.find('.copy-preview-btn').on('click', function() {
+        copyTextToClipboard(content);
+        showNotification("Content copied to clipboard!", "success");
+      });
+    }
+  }
+  
+  // Render mermaid diagrams if requested
+  if (renderMermaidDiagrams) {
+    setTimeout(() => {
+      renderMermaidIn(previewElement.find(".mermaid"));
+    }, 100);
+  }
+  
+  return previewElement;
+}
+
+/**
+ * Helper function to render Mermaid in a specific element
+ * @param {jQuery} element - The element containing mermaid diagrams
+ */
+function renderMermaidInElement(element) {
+  setTimeout(() => {
+    renderMermaidIn(element.find(".mermaid"));
+  }, 100);
+}

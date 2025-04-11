@@ -1031,3 +1031,39 @@ li .tag-tree:before {
   background-color: #f8f9fa;
   border: 1px solid rgba(0,0,0,0.1);
 }
+
+/* Content Preview Styling */
+.content-preview-container {
+  margin-bottom: 15px;
+}
+
+.content-preview-container .preview-title {
+  font-weight: 600;
+  color: #495057;
+}
+
+.content-preview-container .preview-content {
+  transition: all 0.3s ease;
+}
+
+.content-preview-container .btn-group-sm .btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.content-preview-container .preview-footer {
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Add hover effect */
+.content-preview-container:hover .preview-content {
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* Different background for code blocks inside previews */
+.content-preview-container pre code {
+  background-color: #f8f9fa;
+  border-radius: 3px;
+  padding: 2px 4px;
+}

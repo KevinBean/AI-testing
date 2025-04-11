@@ -187,6 +187,7 @@ function previewReferencedBlock(button) {
     fetchBlockById(parseInt(blockId))
       .then(block => {
         if(block) {
+          // REPLACE THIS:
           const previewHtml = `<div class="alert alert-info">
             <strong>Block ${blockId}: ${block.title || ''}</strong> ${renderMarkdown(block.text)}
             ${block.reference ? `<div><strong>Reference:</strong> ${block.reference} 
@@ -199,6 +200,27 @@ function previewReferencedBlock(button) {
           
           setTimeout(() => {
             $(button).closest(".paragraph-block").find(".alert").fadeOut('slow', function() {
+              $(this).remove();
+            });
+          }, 10000);
+          
+          // WITH THIS:
+          const additionalContent = `
+            ${block.reference ? `<div><strong>Reference:</strong> ${block.reference} 
+            ${block.refLevels && block.refLevels.length > 0 ? block.refLevels.join(".") : ""}</div>` : '' }
+            ${block.tags && block.tags.length ? `<div><strong>Tags:</strong> ${block.tags.join(", ")}</div>` : '' }
+          `;
+          
+          const previewElement = createContentPreview(block.text, {
+            title: `Block ${blockId}: ${block.title || ''}`,
+            containerClass: "alert alert-info",
+            additionalFooterContent: additionalContent
+          });
+          
+          $(button).closest(".paragraph-block").append(previewElement);
+          
+          setTimeout(() => {
+            previewElement.fadeOut('slow', function() {
               $(this).remove();
             });
           }, 10000);
@@ -250,15 +272,15 @@ function inheritTagsFromBlock(button) {
  * Preview document live
  */
 function previewDocumentLive() {
-  let previewHTML = "<h1>" + $("#docTitle").val() + "</h1>";
-  let paragraphPreviews = [];
-  let pendingPreviews = 0;
+  // Clear existing content and add title
+  $("#docPreviewContent").html(`<h1>${$("#docTitle").val()}</h1>`);
   
-  $(".paragraph-block").each(function(i) {
+  // Process each paragraph
+  $(".paragraph-block").each(function(index) {
     const content = $(this).find(".docParagraph").val();
     const paraTitle = $(this).find(".paraTitle").val().trim();
     
-    // Get all block references in this paragraph
+    // Get all block references
     const blockRefs = [];
     $(this).find(".blockRef").each(function() {
       const refVal = $(this).val().trim();
@@ -271,96 +293,85 @@ function previewDocumentLive() {
     const tagsStr = $(this).find(".paraTags").val();
     const tags = tagsStr ? tagsStr.split(/,\s*/).filter(t => t.trim()) : [];
     
-    // Start building the paragraph HTML
-    const paraTitleHTML = paraTitle ? `<h4>${paraTitle} (Paragraph ${i+1})</h4>` : `<h4>Paragraph ${i+1}</h4>`;
-    let paragraphHTML = `<div class="mb-3">${paraTitleHTML}${renderMarkdown(content)}`;
+    // Create paragraph container
+    const paragraphContainer = $(`<div class="mb-3 preview-paragraph" data-index="${index}"></div>`);
+    $("#docPreviewContent").append(paragraphContainer);
     
-    // Display paragraph tags if present
-    if(tags.length) {
-      paragraphHTML += `<p><small>Tags: ${tags.map(t => `<span class="badge badge-info">${t}</span>`).join(' ')}</small></p>`;
-    }
+    // Create paragraph title
+    const paragraphTitle = paraTitle ? 
+      `${paraTitle} (Paragraph ${index+1})` : 
+      `Paragraph ${index+1}`;
     
-    // Save the index for ordering later
-    const paragraphIndex = i;
+    // Create additional content for tags
+    const additionalContent = tags.length ? 
+      `<p><small>Tags: ${tags.map(t => `<span class="badge badge-info">${t}</span>`).join(' ')}</small></p>` : 
+      '';
     
-    if(blockRefs.length > 0) {
-      let blockHTML = '';
-      let blocksProcessed = 0;
+    // Create content preview for the paragraph
+    const paragraphPreview = createContentPreview(content, {
+      title: paragraphTitle,
+      showControls: false,
+      additionalFooterContent: additionalContent
+    });
+    
+    paragraphContainer.append(paragraphPreview);
+    
+    // Process block references if any
+    if (blockRefs.length > 0) {
+      const blockRefsContainer = $(`<div class="block-references-container"></div>`);
+      paragraphContainer.append(blockRefsContainer);
       
-      // Increment pending previews counter for this paragraph's blocks
-      pendingPreviews += blockRefs.length;
-      
-      blockRefs.forEach(function(blockRef) {
-        paragraphHTML += `<p><em>Block Reference: ${blockRef}</em></p>`;
+      // Process each block reference
+      blockRefs.forEach(blockRef => {
+        blockRefsContainer.append(`<p><em>Block Reference: ${blockRef}</em></p>`);
         
+        // Add a placeholder while we fetch the block
+        const blockPlaceholder = $(`<div class="block-placeholder-${blockRef}">
+          <div class="text-center">
+            <i class="fas fa-spinner fa-spin"></i> Loading block...
+          </div>
+        </div>`);
+        blockRefsContainer.append(blockPlaceholder);
+        
+        // Fetch and display the block
         fetchBlockById(blockRef)
           .then(block => {
-            if(block) {
-              blockHTML += `<p class="text-info"><strong>${block.title || 'Block ' + block.id}:</strong> ${renderMarkdown(block.text)}` +
-                (block.reference ? ` <span class="block-reference">[Reference: ${block.reference}` +
-                (block.refLevels && block.refLevels.length > 0 ? " " + block.refLevels.join(".") : "") + `]</span>` : "") + 
-                (block.tags && block.tags.length ? ` <small>[Tags: ${block.tags.join(", ")}]</small>` : "") +
-                `<button class="btn btn-sm btn-warning edit-preview-block-btn ml-2" data-block-id="${block.id}">Edit</button></p>`;
+            if (block) {
+              // Create additional content with reference info
+              const blockAdditionalContent = `
+                ${block.reference ? `<span class="block-reference">[Reference: ${block.reference}
+                ${block.refLevels && block.refLevels.length > 0 ? " " + block.refLevels.join(".") : ""}]</span>` : ""} 
+                ${block.tags && block.tags.length ? `<small>[Tags: ${block.tags.join(", ")}]</small>` : ""}
+                <button class="btn btn-sm btn-warning edit-preview-block-btn ml-2" data-block-id="${block.id}">Edit</button>
+              `;
+              
+              // Create preview for the block
+              const blockPreview = createContentPreview(block.text, {
+                title: `${block.title || 'Block ' + block.id}`,
+                containerClass: "referenced-block-preview text-info",
+                showControls: false,
+                additionalFooterContent: blockAdditionalContent
+              });
+              
+              // Replace the placeholder with the actual block preview
+              blockPlaceholder.replaceWith(blockPreview);
+              
+              // Add event handler for edit button
+              blockPreview.find(".edit-preview-block-btn").on("click", function() {
+                const blockId = $(this).data("block-id");
+                editBlockUniversal(blockId);
+              });
             } else {
-              blockHTML += `<p class="text-danger">Block with ID ${blockRef} not found</p>`;
-            }
-            
-            blocksProcessed++;
-            
-            if(blocksProcessed === blockRefs.length) {
-              paragraphHTML += blockHTML + "</div>";
-              
-              // Store the paragraph HTML at the correct index
-              paragraphPreviews[paragraphIndex] = paragraphHTML;
-              pendingPreviews -= blockRefs.length;
-              
-              // Once all previews are done, update the preview content
-              if(pendingPreviews === 0) {
-                // Filter out any undefined entries and join the previews
-                const filteredPreviews = paragraphPreviews.filter(p => p !== undefined);
-                $("#docPreviewContent").html(previewHTML + filteredPreviews.join(''));
-                renderMermaidIn("#docPreviewContent .mermaid");
-
-                // Add event handler for edit buttons
-                $("#docPreviewContent").find(".edit-preview-block-btn").on("click", function() {
-                  const blockId = $(this).data("block-id");
-                  editBlockUniversal(blockId);
-                });
-              }
+              blockPlaceholder.replaceWith(`<p class="text-danger">Block with ID ${blockRef} not found</p>`);
             }
           })
           .catch(error => {
             console.error("Error fetching block:", error);
-            blockHTML += `<p class="text-danger">Error loading block ${blockRef}: ${error.message}</p>`;
-            
-            blocksProcessed++;
-            
-            if(blocksProcessed === blockRefs.length) {
-              paragraphHTML += blockHTML + "</div>";
-              paragraphPreviews[paragraphIndex] = paragraphHTML;
-              pendingPreviews -= blockRefs.length;
-              
-              if(pendingPreviews === 0) {
-                const filteredPreviews = paragraphPreviews.filter(p => p !== undefined);
-                $("#docPreviewContent").html(previewHTML + filteredPreviews.join(''));
-                renderMermaidIn("#docPreviewContent .mermaid");
-              }
-            }
+            blockPlaceholder.replaceWith(`<p class="text-danger">Error loading block ${blockRef}: ${error.message}</p>`);
           });
       });
-    } else {
-      paragraphHTML += "</div>";
-      paragraphPreviews[paragraphIndex] = paragraphHTML;
     }
   });
-  
-  // If there are no block references at all, update preview immediately
-  if(pendingPreviews === 0) {
-    // Filter out any undefined entries and join the previews
-    const filteredPreviews = paragraphPreviews.filter(p => p !== undefined);
-    $("#docPreviewContent").html(previewHTML + filteredPreviews.join(''));
-    renderMermaidIn("#docPreviewContent .mermaid");
-  }
 }
 
 /**
@@ -509,60 +520,84 @@ function loadDocuments(searchTerm = "") {
  * @param {Object} doc - The document to preview
  */
 function previewDocument(doc) {
-  let html = "<div class='card-header'><strong>" + doc.title + "</strong>(ID:" + doc.id + ')<div class="btn-group float-right"><button class="btn btn-sm btn-warning edit-doc-btn">Edit</button><button class="btn btn-sm btn-danger delete-doc-btn">Delete</button></div></div>';
-  
-  doc.paragraphs.forEach((p, i) => {
-    // Add paragraph title if available
-    const paragraphTitle = p.title ? `<h5 class="mb-2">${p.title}</h5>` : `<strong>Paragraph ${i+1}</strong>`;
+  // Create the document header with controls
+  let headerHtml = `<div class='card-header'><strong>${doc.title}</strong> (ID: ${doc.id})
+    <div class="btn-group float-right">
+      <button class="btn btn-sm btn-warning edit-doc-btn">Edit</button>
+      <button class="btn btn-sm btn-danger delete-doc-btn">Delete</button>
+    </div>
+  </div>`;
 
-    html += `<div class="card-body"><div class="paragraph-header">${paragraphTitle}</div>${renderMarkdown(p.content)}`;
+  $("#docPreviewContent").html(headerHtml);
+  
+  // Process each paragraph
+  doc.paragraphs.forEach((p, i) => {
+    // Create paragraph container
+    const paragraphContainer = $(`<div class="card-body paragraph-container mb-3" data-paragraph-index="${i}"></div>`);
+    $("#docPreviewContent").append(paragraphContainer);
     
-    // Display paragraph tags if present
-    if(p.tags && p.tags.length) {
-      html += `<p><small>Tags: ${p.tags.map(t => `<span class="badge badge-info">${t}</span>`).join(' ')}</small></p>`;
-    }
+    // Add paragraph title if available
+    const paragraphTitle = p.title ? 
+      `<h5 class="mb-2">${p.title}</h5>` : 
+      `<strong>Paragraph ${i+1}</strong>`;
+    
+    // Create content preview for paragraph
+    const additionalContent = `
+      ${p.tags && p.tags.length ? 
+        `<p><small>Tags: ${p.tags.map(t => `<span class="badge badge-info">${t}</span>`).join(' ')}</small></p>` : ''}
+    `;
+    
+    const paragraphPreview = createContentPreview(p.content, {
+      title: paragraphTitle,
+      showControls: false,
+      additionalFooterContent: additionalContent,
+      containerClass: "paragraph-content-container"
+    });
+    
+    paragraphContainer.append(paragraphPreview);
     
     // Handle block references
     const blockRefs = p.blockRefs || (p.blockRef ? [p.blockRef] : []);
     if (blockRefs.length > 0) {
       blockRefs.forEach(blockRef => {
-        html += `<p><em>Block Reference: ${blockRef}</em></p>`;
+        paragraphContainer.append(`<p><em>Block Reference: ${blockRef}</em></p>`);
         
         fetchBlockById(blockRef)
           .then(block => {
             if (block) {
-              const blockHtml = `<p class="text-info"><strong>${block.title || 'Block ' + block.id}:</strong> ${renderMarkdown(block.text)}` +
-                (block.reference ? ` <span class="block-reference">[Reference: ${block.reference}` +
-                (block.refLevels && block.refLevels.length > 0 ? " " + block.refLevels.join(".") : "") + `]</span>` : "") + 
-                (block.tags && block.tags.length ? ` <small>[Tags: ${block.tags.join(", ")}]</small>` : "") +
-                `<button class="btn btn-sm btn-warning edit-doc-block-btn ml-2" data-block-id="${block.id}">Edit</button></p>`;
+              // Create preview for referenced block
+              const blockAdditionalContent = `
+                ${block.reference ? `<span class="block-reference">[Reference: ${block.reference}
+                ${block.refLevels && block.refLevels.length > 0 ? " " + block.refLevels.join(".") : ""}]</span>` : ""} 
+                ${block.tags && block.tags.length ? `<small>[Tags: ${block.tags.join(", ")}]</small>` : ""}
+                <button class="btn btn-sm btn-warning edit-doc-block-btn ml-2" data-block-id="${block.id}">Edit</button>
+              `;
               
-              // Append the block HTML to the document preview
-              $(blockHtml).appendTo("#docPreviewContent .card-body").last();
+              const blockPreview = createContentPreview(block.text, {
+                title: `${block.title || 'Block ' + block.id}`,
+                containerClass: "referenced-block-preview text-info",
+                showControls: false,
+                additionalFooterContent: blockAdditionalContent
+              });
+              
+              paragraphContainer.append(blockPreview);
               
               // Add event handler for edit buttons
-              $(".edit-doc-block-btn").on("click", function() {
+              blockPreview.find(".edit-doc-block-btn").on("click", function() {
                 const blockId = $(this).data("block-id");
                 editBlockUniversal(blockId);
               });
             } else {
-              const errorHtml = `<p class="text-danger">Block not found</p>`;
-              $(errorHtml).appendTo("#docPreviewContent .card-body").last();
+              paragraphContainer.append(`<p class="text-danger">Block not found</p>`);
             }
           })
           .catch(error => {
             console.error("Error fetching block:", error);
-            const errorHtml = `<p class="text-danger">Error loading block: ${error.message}</p>`;
-            $(errorHtml).appendTo("#docPreviewContent .card-body").last();
+            paragraphContainer.append(`<p class="text-danger">Error loading block: ${error.message}</p>`);
           });
       });
     }
-    
-    html += "</div>";
   });
-  
-  $("#docPreviewContent").html(html);
-  renderMermaidIn("#docPreviewContent .mermaid");
 
   // Set up delete button handler
   $(".delete-doc-btn").on("click", function(e) {

@@ -2257,34 +2257,11 @@ function executeDashboardAction(actionId, content) {
       return;
     }
     
-    const contentPreview = $(`
-      <div class="card mb-3 dashboard-result-card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Content Preview</span>
-          <button class="btn btn-sm btn-outline-secondary toggle-content-btn">
-            <i class="fas fa-eye-slash"></i> Hide
-          </button>
-        </div>
-        <div class="card-body content-preview-body">
-          <div class="alert alert-info">
-            <small class="text-muted">This is the content that will be processed:</small>
-          </div>
-          <pre class="bg-light p-2 border rounded" id="combinedContent">${content || '<em>No content provided</em>'}</pre>
-        </div>
-      </div>
-    `);
-    
-    contentPreview.find('.toggle-content-btn').on('click', function() {
-      const previewBody = contentPreview.find('.content-preview-body');
-      const btn = $(this);
-      
-      if (previewBody.is(':visible')) {
-        previewBody.slideUp();
-        btn.html('<i class="fas fa-eye"></i> Show');
-      } else {
-        previewBody.slideDown();
-        btn.html('<i class="fas fa-eye-slash"></i> Hide');
-      }
+    const contentPreview = createContentPreview(content, {
+      title: "Content Preview",
+      additionalHeaderContent: '<small class="text-muted ml-2">Content to be processed</small>',
+      containerClass: "card mb-3",
+      maxHeight: 300
     });
     
     const processedPrompt = action.prompt.replace(/{content}/g, content || "");
@@ -2304,34 +2281,33 @@ function executeDashboardAction(actionId, content) {
     
     callOpenAiApi(action, processedPrompt).then(response => {
       $("#dashboardActionResultContainer").find('.text-center').remove();
-      $("#dashboardActionResultContainer").append(`
-        <div class="card dashboard-result-card">
-          <div class="card-header">Result</div>
-          <div class="card-body">
-            <div class="bg-light p-3 border rounded result-content">${renderMarkdown(response)}</div>
-            <div class="mt-3">
-              <button class="btn btn-sm btn-outline-primary copy-result-btn">
-                <i class="fas fa-copy"></i> Copy Results
-              </button>
-              <button class="btn btn-sm btn-outline-success save-as-paragraph-btn">
-                <i class="fas fa-save"></i> Save as Paragraph
-              </button>
-            </div>
+      const resultPreview = createContentPreview(response, {
+        title: "Result",
+        containerClass: "card",
+        additionalFooterContent: `
+          <div class="mt-2">
+            <button class="btn btn-sm btn-outline-primary copy-result-btn">
+              <i class="fas fa-copy"></i> Copy Results
+            </button>
+            <button class="btn btn-sm btn-outline-success save-as-paragraph-btn">
+              <i class="fas fa-save"></i> Save as Paragraph
+            </button>
           </div>
-        </div>
-      `);
-      
-      renderMermaidIn("#dashboardActionResultContainer .result-content .mermaid");
-      
-      $("#dashboardActionResultContainer").data("raw-result", response);
-      
-      $(".copy-result-btn").click(function() {
-        copyTextToClipboard(response);
+        `
       });
+
+      $("#dashboardActionResultContainer").append(resultPreview);
+$("#dashboardActionResultContainer").data("raw-result", response);
+
+// Add event handlers for the buttons
+resultPreview.find(".copy-result-btn").click(function() {
+  copyTextToClipboard(response);
+});
+
+resultPreview.find(".save-as-paragraph-btn").click(function() {
+  saveResultAsParagraph(response);
+});
       
-      $(".save-as-paragraph-btn").click(function() {
-        saveResultAsParagraph(response);
-      });
     }).catch(error => {
       $("#dashboardActionResultContainer").find('.text-center').remove();
       $("#dashboardActionResultContainer").append(`

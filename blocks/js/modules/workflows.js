@@ -471,40 +471,62 @@ async function runEntireWorkflow(workflow) {
  * @param {string} finalResult - Final result
  */
 function displayWorkflowResults(stepResults, finalResult) {
-  let html = '<div class="card"><div class="card-header">Workflow Results</div><div class="card-body">';
+  const resultsContainer = $('<div class="card"><div class="card-header">Workflow Results</div><div class="card-body"></div></div>');
+  const resultsBody = resultsContainer.find('.card-body');
   
+  // Add each step result
   stepResults.forEach(result => {
-    html += `<div class="mb-3">
+    const stepDiv = $(`<div class="mb-3">
       <h6>Step ${result.step}: ${result.name}</h6>
       <p>Status: <span class="badge badge-${result.status === 'success' ? 'success' : 'danger'}">${result.status}</span></p>
-      ${result.result ? `<div class="bg-light p-2 border rounded">${renderMarkdown(result.result)}</div>` : ''}
       ${result.message ? `<p class="text-danger">${result.message}</p>` : ''}
-    </div>`;
+    </div>`);
+    
+    resultsBody.append(stepDiv);
+    
+    // If the step has a result, create a preview for it
+    if (result.result) {
+      const stepResultPreview = createContentPreview(result.result, {
+        showControls: false, // No controls for individual step results
+        maxHeight: 200
+      });
+      
+      stepDiv.append(stepResultPreview);
+    }
   });
   
-  html += `<div class="mt-3">
+  // Create a preview for the final result
+  const finalResultDiv = $(`<div class="mt-4">
     <h5>Final Result:</h5>
-    <div class="bg-light p-2 border rounded">${renderMarkdown(finalResult)}</div>
-    <div class="mt-3">
-      <button class="btn btn-sm btn-outline-primary copy-result-btn">
-        <i class="fas fa-copy"></i> Copy Results
-      </button>
-      <button class="btn btn-sm btn-outline-success save-result-btn">
-        <i class="fas fa-save"></i> Save as Paragraph
-      </button>
-    </div>
-  </div>`;
+  </div>`);
   
-  html += '</div></div>';
-  $("#workflowResultContainer").html(html);
-  renderMermaidIn("#workflowResultContainer .mermaid");
+  const finalResultPreview = createContentPreview(finalResult, {
+    showControls: false,
+    additionalFooterContent: `
+      <div class="mt-3">
+        <button class="btn btn-sm btn-outline-primary copy-final-result-btn">
+          <i class="fas fa-copy"></i> Copy Results
+        </button>
+        <button class="btn btn-sm btn-outline-success save-final-result-btn">
+          <i class="fas fa-save"></i> Save as Paragraph
+        </button>
+      </div>
+    `
+  });
+  
+  finalResultDiv.append(finalResultPreview);
+  resultsBody.append(finalResultDiv);
+  
+  // Clear the container and add our results
+  $("#workflowResultContainer").empty().append(resultsContainer);
   
   // Add event handlers for the buttons
-  $(".copy-result-btn").click(function() {
+  $(".copy-final-result-btn").click(function() {
     copyTextToClipboard(finalResult);
+    showNotification("Results copied to clipboard!");
   });
   
-  $(".save-result-btn").click(function() {
+  $(".save-final-result-btn").click(function() {
     saveResultAsParagraph(finalResult);
   });
 }
@@ -833,45 +855,14 @@ async function executeWorkflowStep(step, inputContent, workflow, stepIndex) {
     stepContainer.find('.step-status')
       .html('<span class="badge badge-success">Success</span>');
     
-    const resultContainer = stepContainer.find('.step-result');
-    resultContainer.html(`
-      <div class="card mt-2">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <span>Result</span>
-          <div>
-            <button class="btn btn-sm btn-outline-primary copy-step-result-btn">
-              <i class="fas fa-copy"></i> Copy
-            </button>
-            <button class="btn btn-sm btn-outline-secondary toggle-step-result-btn">
-              <i class="fas fa-eye-slash"></i> Hide
-            </button>
-          </div>
-        </div>
-        <div class="card-body step-result-content">
-          <div class="bg-light p-2 border rounded result-content">${renderMarkdown(result)}</div>
-        </div>
-      </div>
-    `);
-    
-    renderMermaidIn(resultContainer.find(".result-content .mermaid"));
-    
-    resultContainer.find('.toggle-step-result-btn').click(function() {
-      const resultContent = $(this).closest('.card').find('.step-result-content');
-      const btn = $(this);
+      const resultContainer = stepContainer.find('.step-result');
+      const resultPreview = createContentPreview(result, {
+        title: "Result",
+        containerClass: "card mt-2",
+        maxHeight: 300
+      });
       
-      if (resultContent.is(':visible')) {
-        resultContent.slideUp();
-        btn.html('<i class="fas fa-eye"></i> Show');
-      } else {
-        resultContent.slideDown();
-        btn.html('<i class="fas fa-eye-slash"></i> Hide');
-      }
-    });
-    
-    resultContainer.find('.copy-step-result-btn').click(function() {
-      copyTextToClipboard(result);
-      showNotification("Step result copied to clipboard!");
-    });
+      resultContainer.empty().append(resultPreview);
     
     const nextStepIndex = stepIndex + 1;
     if (nextStepIndex < workflow.steps.length) {
