@@ -121,23 +121,45 @@ function loadReferencesMetadata(searchTerm = "") {
     return;
   }
   
-  const transaction = db.transaction("references", "readonly");
-  const store = transaction.objectStore("references");
-  
-  store.openCursor().onsuccess = function(e) {
-    const cursor = e.target.result;
-    if(cursor) {
-      const ref = cursor.value;
-      const searchableText = (
-        ref.id + " " + 
-        ref.name + " " + 
-        (ref.description || "") + " " + 
-        (ref.type || "") + " " + 
-        (ref.author || "") +
-        (ref.year ? ref.year.toString() : "")
-      ).toLowerCase();
-      
-      if(searchTerm === "" || searchableText.indexOf(searchTerm.toLowerCase()) !== -1) {
+  // Use SearchHelper for more powerful searches
+  if (searchTerm) {
+    SearchHelper.searchReferences(searchTerm)
+      .then(results => {
+        if (results.length === 0) {
+          $("#referenceList").append('<li class="list-group-item">No references found matching your search.</li>');
+          return;
+        }
+        
+        results.forEach(result => {
+          const ref = result.item;
+          
+          let displayText = `<strong>${ref.id} - ${ref.name}</strong>`;
+          if(ref.type) displayText += ` <span class="badge badge-secondary">${ref.type}</span>`;
+          if(ref.author) displayText += `<br><small>Author: ${ref.author}</small>`;
+          if(ref.year) displayText += `<small> (${ref.year})</small>`;
+          
+          const li = $("<li>")
+            .addClass("list-group-item list-item")
+            .html(displayText)
+            .click(function() { combineReference(ref.id); });
+          
+          $("#referenceList").append(li);
+        });
+      })
+      .catch(err => {
+        console.error("Search error:", err);
+        $("#referenceList").append('<li class="list-group-item text-danger">Error searching references: ' + err.message + '</li>');
+      });
+  } else {
+    // Default behavior for no search term
+    const transaction = db.transaction("references", "readonly");
+    const store = transaction.objectStore("references");
+    
+    store.openCursor().onsuccess = function(e) {
+      const cursor = e.target.result;
+      if(cursor) {
+        const ref = cursor.value;
+        
         let displayText = `<strong>${ref.id} - ${ref.name}</strong>`;
         if(ref.type) displayText += ` <span class="badge badge-secondary">${ref.type}</span>`;
         if(ref.author) displayText += `<br><small>Author: ${ref.author}</small>`;
@@ -149,10 +171,10 @@ function loadReferencesMetadata(searchTerm = "") {
           .click(function() { combineReference(ref.id); });
         
         $("#referenceList").append(li);
+        cursor.continue();
       }
-      cursor.continue();
-    }
-  };
+    };
+  }
 }
 
 /**

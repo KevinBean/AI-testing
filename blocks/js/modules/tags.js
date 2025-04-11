@@ -273,11 +273,102 @@ function updateTagVisualization(tagCounts) {
  * @param {string} tag - Tag to filter by
  */
 function loadContentByTag(tag) {
-  // Load blocks with the tag
-  loadBlocksByTag(tag);
+  // Show a loading spinner while content is being loaded
+  $("#taggedBlocksList, #taggedDocumentsList").html(
+    '<div class="text-center py-3"><i class="fas fa-spinner fa-spin"></i> Loading content...</div>'
+  );
   
-  // Load documents with the tag
-  loadDocumentsByTag(tag);
+  // Use SearchHelper for more advanced tag filtering
+  SearchHelper.searchByTag(tag)
+    .then(results => {
+      // Update block list
+      const blocksList = $("#taggedBlocksList");
+      if (results.blocks.length === 0) {
+        blocksList.html(`
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle mr-2"></i> No blocks found with tag "${tag}"
+          </div>
+        `);
+      } else {
+        blocksList.empty();
+        results.blocks.forEach(result => {
+          const block = result.item;
+          const blockItem = $(`
+            <div class="card mb-2">
+              <div class="card-body">
+                <h6>${block.title || 'Block'} (ID: ${block.id})</h6>
+                <div>${renderMarkdown(block.text)}</div>
+                <div class="mt-2 d-flex justify-content-between">
+                  <div>
+                    ${block.tags.map(t => {
+                      const isCurrentTag = t === tag;
+                      return `<span class="badge ${isCurrentTag ? 'badge-primary' : 'badge-info'} mr-1">
+                        ${t}${isCurrentTag ? ' <i class="fas fa-check"></i>' : ''}
+                      </span>`;
+                    }).join('')}
+                  </div>
+                  <div>
+                    <button class="btn btn-sm btn-warning edit-tag-block-btn" data-block-id="${block.id}">Edit</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `);
+          
+          blockItem.find(".edit-tag-block-btn").on("click", function() {
+            const blockId = $(this).data("block-id");
+            editBlockUniversal(blockId);
+          });
+          
+          blocksList.append(blockItem);
+        });
+      }
+      
+      // Update document list
+      const documentsList = $("#taggedDocumentsList");
+      if (results.documents.length === 0) {
+        documentsList.html(`
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle mr-2"></i> No documents found with tag "${tag}"
+          </div>
+        `);
+      } else {
+        documentsList.empty();
+        results.documents.forEach(result => {
+          const doc = result.item;
+          const docItem = $(`
+            <div class="card mb-2">
+              <div class="card-body">
+                <h6>Document: ${doc.title}</h6>
+                <button class="btn btn-sm btn-outline-primary view-doc-btn" data-id="${doc.id}">View Document</button>
+              </div>
+            </div>
+          `);
+          
+          docItem.find(".view-doc-btn").click(function() {
+            previewDocument(doc);
+            $('#viewTabs a[href="#documentsView"]').tab('show');
+          });
+          
+          documentsList.append(docItem);
+        });
+      }
+      
+      // Update tagged count
+      $("#taggedItemCount").text(results.blocks.length + results.documents.length);
+      
+      // Update tabs with counts
+      $("#tag-blocks-tab").html(`<i class="fas fa-cube"></i> Blocks <span class="badge badge-light">${results.blocks.length}</span>`);
+      $("#tag-documents-tab").html(`<i class="fas fa-file-alt"></i> Documents <span class="badge badge-light">${results.documents.length}</span>`);
+    })
+    .catch(error => {
+      console.error("Error loading tag content:", error);
+      $("#taggedBlocksList, #taggedDocumentsList").html(`
+        <div class="alert alert-danger">
+          <i class="fas fa-exclamation-triangle mr-2"></i> Error loading content: ${error.message}
+        </div>
+      `);
+    });
 }
 
 /**

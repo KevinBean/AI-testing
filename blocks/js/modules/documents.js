@@ -484,31 +484,62 @@ function loadDocuments(searchTerm = "") {
   }
   
   try {
-    const transaction = db.transaction("documents", "readonly");
-    const store = transaction.objectStore("documents");
-    store.openCursor().onsuccess = function(e) {
-      const cursor = e.target.result;
-      if(cursor) {
-        const doc = cursor.value;
-        // Use combinedContent for searching if available
-        let searchableText = doc.title + " " + (doc.combinedContent || "");
-        
-        // Fall back to paragraph-by-paragraph search if no combinedContent
-        if (!doc.combinedContent) {
-          doc.paragraphs.forEach(p => {
-            searchableText += " " + p.content.replace(/<[^>]+>/g, "");
+    // Use SearchHelper for more powerful searches
+    if (searchTerm) {
+      SearchHelper.searchDocuments(searchTerm)
+        .then(results => {
+          if (results.length === 0) {
+            $("#docList").append('<li class="list-group-item">No documents found matching your search.</li>');
+            return;
+          }
+          
+          results.forEach(result => {
+            const doc = result.item;
+            
+            // Use the highlightMatches function for better search result display
+            let renderedText = SearchHelper.highlightMatches(
+              doc.combinedContent || (doc.paragraphs && doc.paragraphs.length ? doc.paragraphs[0].content : ""),
+              searchTerm
+            );
+            
+            let display = "<strong>" + doc.title + "</strong><br>" + renderedText;
+            
+            const li = $('<li>').addClass('list-group-item list-item').html(display);
+            li.click(function(){ previewDocument(doc); });
+            
+            $("#docList").append(li);
           });
-        }
-        if(!searchTerm || searchableText.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1) {
-          let renderedText = getHighlightedSearchContext(doc.combinedContent || doc.paragraphs[0].content, searchTerm);
+        })
+        .catch(err => {
+          console.error("Search error:", err);
+          $("#docList").append('<li class="list-group-item text-danger">Error searching documents: ' + err.message + '</li>');
+        });
+    } else {
+      // Default behavior for no search term
+      const transaction = db.transaction("documents", "readonly");
+      const store = transaction.objectStore("documents");
+      
+      store.openCursor().onsuccess = function(e) {
+        const cursor = e.target.result;
+        if(cursor) {
+          const doc = cursor.value;
+          
+          let renderedText = renderMarkdown(
+            doc.combinedContent ?
+              doc.combinedContent.substring(0, 100) + (doc.combinedContent.length > 100 ? "..." : "") :
+              doc.paragraphs[0].content.substring(0, 100) + (doc.paragraphs[0].content.length > 100 ? "..." : "")
+          );
+          
           let display = "<strong>" + doc.title + "</strong><br>" + renderedText;
-          const li = $(`<li class="list-group-item list-item">${display}</li>`);
+          
+          const li = $('<li>').addClass('list-group-item list-item').html(display);
           li.click(function(){ previewDocument(doc); });
+          
           $("#docList").append(li);
+          cursor.continue();
         }
-        cursor.continue();
-      }
-    };
+      };
+    }
   } catch (err) {
     console.error("Database error:", err);
     $("#docList").append('<li class="list-group-item">Database not available. Please refresh the page.</li>');

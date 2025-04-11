@@ -424,3 +424,72 @@ $("#addDocToCollection").click(function() {
 });
 
 $("#cancelCollectionBtn").click(resetCollectionForm);
+
+/**
+ * Quick search blocks for collection
+ * @param {string} query - Search query
+ */
+function quickSearchBlocksForCollection(query) {
+  if (!query || query.length < 2) {
+    loadBlocksForCollection(); // Default loader
+    return;
+  }
+  
+  const list = $("#blockSelectionList");
+  list.html('<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Searching...</div>');
+  
+  SearchHelper.searchBlocks(query)
+    .then(results => {
+      if (results.length === 0) {
+        list.html('<p class="text-center text-muted">No blocks found matching your search.</p>');
+        return;
+      }
+      
+      let html = '';
+      results.forEach(result => {
+        const block = result.item;
+        const preview = block.text.length > 100 ? block.text.substring(0, 100) + "..." : block.text;
+        
+        html += `
+          <div class="card mb-2">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <h6>${block.title || 'Block ' + block.id}</h6>
+                  <small>${preview}</small>
+                </div>
+                <button class="btn btn-sm btn-primary add-block-btn" data-id="${block.id}" data-title="${block.title || 'Block ' + block.id}">Add</button>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      
+      list.html(html);
+      
+      // Add event handlers
+      $(".add-block-btn").click(function() {
+        const blockId = $(this).data("id");
+        const blockTitle = $(this).data("title");
+        
+        collectionItems.push({
+          type: 'block',
+          id: blockId,
+          title: blockTitle
+        });
+        
+        updateCollectionItemsUI();
+        $("#selectBlockModal").modal('hide');
+      });
+    })
+    .catch(err => {
+      console.error("Search error:", err);
+      list.html(`<p class="text-danger">Error searching blocks: ${err.message}</p>`);
+    });
+}
+
+// Add this to your collection.js initialization
+$("#blockSearchInput").on("input", function() {
+  const query = $(this).val().trim();
+  quickSearchBlocksForCollection(query);
+});

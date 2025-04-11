@@ -118,18 +118,61 @@ function loadBlocks(searchTerm = "") {
   }
   
   try {
-    const transaction = db.transaction("blocks", "readonly");
-    const store = transaction.objectStore("blocks");
-    
-    store.openCursor().onsuccess = function(e) {
-      const cursor = e.target.result;
-      if(cursor) {
-        const block = cursor.value;
-        const title = block.title || "Block " + block.id;
-        const combinedText = (title + " " + block.text + " " + block.tags.join(" ") + " " + (block.reference || "")).toLowerCase();
-        
-        if(searchTerm === "" || combinedText.indexOf(searchTerm.toLowerCase()) !== -1) {
-          let renderedText = getHighlightedSearchContext(block.text, searchTerm);
+    // Use SearchHelper for more powerful searches
+    if (searchTerm) {
+      SearchHelper.searchBlocks(searchTerm)
+        .then(results => {
+          if (results.length === 0) {
+            $("#blockList").append('<li class="list-group-item">No blocks found matching your search.</li>');
+            return;
+          }
+          
+          results.forEach(result => {
+            const block = result.item;
+            const title = block.title || "Block " + block.id;
+            
+            // Use the highlightMatches function for better search result display
+            let renderedText = SearchHelper.highlightMatches(block.text, searchTerm);
+            let display = "<strong>" + title + "</strong><br>" + renderedText;
+            
+            if(block.tags.length) {
+              display += " <span class='badge badge-info'>" + block.tags.join("</span> <span class='badge badge-info'>") + "</span><br>";
+            }
+            
+            if(block.reference) {
+              display += " <span class='block-reference'>[[" + block.reference;
+              if(block.refLevels && block.refLevels.length > 0) { 
+                display += " " + block.refLevels.join("."); 
+              }
+              display += "]]</span>";
+            }
+            
+            const li = $("<li>").addClass("list-group-item list-item").html(display);
+            
+            // Make the entire list item clickable to show block details
+            li.on("click", function() {
+              showBlockDetails(block);
+            });
+            
+            $("#blockList").append(li);
+          });
+        })
+        .catch(err => {
+          console.error("Search error:", err);
+          $("#blockList").append('<li class="list-group-item text-danger">Error searching blocks: ' + err.message + '</li>');
+        });
+    } else {
+      // Default behavior for no search term
+      const transaction = db.transaction("blocks", "readonly");
+      const store = transaction.objectStore("blocks");
+      
+      store.openCursor().onsuccess = function(e) {
+        const cursor = e.target.result;
+        if(cursor) {
+          const block = cursor.value;
+          const title = block.title || "Block " + block.id;
+          
+          let renderedText = renderMarkdown(block.text.substring(0, 100) + (block.text.length > 100 ? "..." : ""));
           let display = "<strong>" + title + "</strong><br>" + renderedText;
           
           if(block.tags.length) {
@@ -146,16 +189,15 @@ function loadBlocks(searchTerm = "") {
           
           const li = $("<li>").addClass("list-group-item list-item").html(display);
           
-          // Make the entire list item clickable to show block details
           li.on("click", function() {
             showBlockDetails(block);
           });
           
           $("#blockList").append(li);
+          cursor.continue();
         }
-        cursor.continue();
-      }
-    };
+      };
+    }
   } catch (err) {
     console.error("Database error:", err);
     $("#blockList").append('<li class="list-group-item text-danger">Error loading blocks. Please refresh the page.</li>');

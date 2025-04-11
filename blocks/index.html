@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
   <!-- Custom CSS -->
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/search-styles.css">
   <!-- Marked.js for Markdown rendering -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <!-- Mermaid -->
@@ -380,22 +381,30 @@
           <h5><i class="fas fa-search"></i> Universal Search</h5>
         </div>
         <div class="card-body">
-          <div class="input-group mb-3">
-            <input type="text" id="universalSearch" class="form-control form-control-lg universal-search-input" placeholder="Search across all content...">
-            <div class="input-group-append">
-              <select class="form-control universal-search-scope" id="searchScope">
-                <option value="all">All Content</option>
-                <option value="blocks">Blocks</option>
-                <option value="documents">Documents</option>
-                <option value="references">References</option>
-                <option value="tags">Tags</option>
-              </select>
-              <button class="btn btn-primary universal-search-btn" id="universalSearchBtn">
-                <i class="fas fa-search"></i> Search
-              </button>
+          <form id="searchForm">
+            <div class="search-container">
+              <div class="input-group mb-3">
+                <input type="text" id="universalSearch" class="form-control form-control-lg search-input" 
+                  placeholder="Search across all content..." autocomplete="off">
+                <div class="input-group-append">
+                  <select class="form-control universal-search-scope" id="searchScope">
+                    <option value="all">All Content</option>
+                    <option value="blocks">Blocks</option>
+                    <option value="documents">Documents</option>
+                    <option value="references">References</option>
+                    <option value="tags">Tags</option>
+                  </select>
+                  <button class="btn btn-primary universal-search-btn" id="universalSearchBtn" type="submit">
+                    <i class="fas fa-search"></i> Search
+                  </button>
+                </div>
+              </div>
+              <small class="text-muted">Use advanced syntax: "exact phrase", field:term, AND, OR, NOT</small>
             </div>
-          </div>
-          <small class="text-muted">Search all content in the system by keywords, tags, or references</small>
+          </form>
+          
+          <!-- Results will be shown here -->
+          <div id="searchResultsContainer"></div>
         </div>
       </div>
     </div>
@@ -1019,6 +1028,59 @@ $$</pre>
               <strong>Note:</strong> To use AI features, you need to configure your OpenAI API key in the Settings tab.
             </div>
           </div>
+
+          <div class="tab-pane fade" id="searchHelp" role="tabpanel">
+            <h5>Advanced Search Capabilities</h5>
+            
+            <h6 class="mt-3">Basic Search</h6>
+            <p>Simply type keywords to search across all content.</p>
+            
+            <h6 class="mt-3">Boolean Operators</h6>
+            <table class="table table-sm">
+              <tr>
+                <td><code>term1 AND term2</code></td>
+                <td>Find content containing both terms</td>
+              </tr>
+              <tr>
+                <td><code>term1 OR term2</code></td>
+                <td>Find content containing either term (default)</td>
+              </tr>
+              <tr>
+                <td><code>term1 NOT term2</code> or <code>term1 -term2</code></td>
+                <td>Find content with term1 but without term2</td>
+              </tr>
+            </table>
+            
+            <h6 class="mt-3">Exact Phrase Matching</h6>
+            <p>Use quotes for exact phrases: <code>"exact phrase match"</code></p>
+            
+            <h6 class="mt-3">Field-Specific Search</h6>
+            <table class="table table-sm">
+              <tr>
+                <td><code>title:term</code></td>
+                <td>Search only in titles</td>
+              </tr>
+              <tr>
+                <td><code>content:term</code></td>
+                <td>Search only in content</td>
+              </tr>
+              <tr>
+                <td><code>tags:term</code></td>
+                <td>Search only in tags</td>
+              </tr>
+              <tr>
+                <td><code>reference:term</code></td>
+                <td>Search only in references</td>
+              </tr>
+            </table>
+            
+            <h6 class="mt-3">Combined Examples</h6>
+            <ul>
+              <li><code>title:safety AND requirements</code> - Find content with "safety" in the title and "requirements" anywhere</li>
+              <li><code>"power system" NOT failure</code> - Find content with the phrase "power system" but without "failure"</li>
+              <li><code>tags:important content:urgent</code> - Find content tagged as "important" with "urgent" in the content</li>
+            </ul>
+          </div>
           
           <div class="tab-pane fade" id="faqHelp" role="tabpanel">
             <h5>Frequently Asked Questions</h5>
@@ -1235,7 +1297,8 @@ $$</pre>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 
   <!-- Application Scripts -->
-  <script src="js/helpers.js"></script>
+  <script src="js/helpers/helpers.js"></script>
+  <script src="js/helpers/search-helper.js"></script>
   <script src="js/render.js"></script>
   <script src="js/db.js"></script>
   <script src="js/modules/blocks.js"></script>
@@ -1247,6 +1310,10 @@ $$</pre>
   <script src="js/modules/actions.js"></script>
   <script src="js/modules/workflows.js"></script>
   <script src="js/modules/settings.js"></script>
+  <script src="js/search-ui.js"></script>
   <script src="js/main.js"></script>
+
+
+
 </body>
 </html>

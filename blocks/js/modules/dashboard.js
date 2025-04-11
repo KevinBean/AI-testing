@@ -12,6 +12,17 @@ function initializeDashboard() {
       $('#dashboard-tab').tab('show');
     }, 100);
   }
+
+    // Initialize the search UI if available
+    if (typeof SearchUI !== 'undefined') {
+      SearchUI.init({
+        searchInputSelector: '#universalSearch',
+        searchButtonSelector: '#universalSearchBtn',
+        searchScopeSelector: '#searchScope',
+        resultsContainerSelector: '#searchResultsContainer',
+        searchFormSelector: '#searchForm'
+      });
+    }
   
   // Update system stats
   updateSystemStats();
@@ -36,28 +47,28 @@ function initializeDashboard() {
  * Initialize enhanced universal search with better UX
  */
 function initializeEnhancedUniversalSearch() {
-  $("#universalSearchBtn").click(function() {
-    const searchTerm = $("#universalSearch").val().trim();
-    const searchScope = $("#searchScope").val();
-    
-    if (searchTerm) {
-      performUniversalSearch(searchTerm, searchScope);
-    }
-  });
+  // This is now handled by SearchUI, no need for duplicate event handlers
+  // If you need to customize the behavior, do so through the SearchUI.init options
   
-  // Also trigger search on Enter key
-  $("#universalSearch").keypress(function(e) {
-    if (e.which === 13) {
-      $("#universalSearchBtn").click();
-    }
-  });
-
-  // Add clear search results functionality
-  $(document).on('click', '.clear-search-results-btn', function() {
-    $("#dashboardSearchResults").slideUp(300, function() {
-      $(this).remove();
+  // Legacy search functionality can be kept as a fallback
+  if (typeof SearchUI === 'undefined') {
+    console.warn("SearchUI not available, using legacy search");
+    
+    $("#universalSearchBtn").click(function() {
+      const searchTerm = $("#universalSearch").val().trim();
+      const searchScope = $("#searchScope").val();
+      
+      if (searchTerm) {
+        performUniversalSearch(searchTerm, searchScope);
+      }
     });
-  });
+    
+    $("#universalSearch").keypress(function(e) {
+      if (e.which === 13) {
+        $("#universalSearchBtn").click();
+      }
+    });
+  }
 }
 
 /**
