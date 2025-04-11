@@ -250,6 +250,32 @@ function findParagraphsReferencingBlock(blockId) {
 }
 
 /**
+ * Securely store the API key
+ * @param {string} apiKey - The API key to store
+ */
+function secureStoreApiKey(apiKey) {
+  // Simple obfuscation - not true encryption but better than plain text
+  const encodedKey = btoa(apiKey);
+  localStorage.setItem('openai_api_key_secure', encodedKey);
+}
+
+/**
+ * Retrieve the stored API key
+ * @returns {string|null} - The API key or null if not found
+ */
+function getSecureApiKey() {
+  const encodedKey = localStorage.getItem('openai_api_key_secure');
+  if (!encodedKey) return null;
+  
+  try {
+    return atob(encodedKey);
+  } catch (e) {
+    console.error("Failed to decode API key");
+    return null;
+  }
+}
+
+/**
  * Function to handle API settings form submission 
  * @param {Event} e - Form submission event
  */
@@ -258,7 +284,8 @@ function handleApiSettingsFormSubmit(e) {
   const apiKey = $("#apiKey").val().trim();
   
   if (apiKey) {
-    localStorage.setItem('openai_api_key', apiKey);
+    // Use our secure storage instead of direct localStorage
+    secureStoreApiKey(apiKey);
     openaiApiKey = apiKey;
     showNotification("API key saved successfully!");
     updateApiKeyStatus();

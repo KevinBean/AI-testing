@@ -25,7 +25,7 @@ $(document).ready(function() {
   $('[data-toggle="tooltip"]').tooltip();
   
   // Load API key from local storage
-  openaiApiKey = localStorage.getItem('openai_api_key');
+  openaiApiKey = getSecureApiKey();
   updateApiKeyStatus();
   
   // Initialize the database FIRST, then attach event handlers
@@ -195,7 +195,7 @@ function registerEventHandlers() {
   // API Key UI handlers
   $("#clearApiKey").on("click", function() {
     if (confirm("Are you sure you want to remove your API key?")) {
-      localStorage.removeItem('openai_api_key');
+      localStorage.removeItem('openai_api_key_secure');
       openaiApiKey = null;
       $("#apiKey").val('');
       showNotification("API key removed");
