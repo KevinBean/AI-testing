@@ -9,6 +9,11 @@ $(document).ready(function() {
   $("#actionTemperature").on("input", function() {
     $("#tempValue").text($(this).val());
   });
+
+  // Update the displayed value when slider changes
+  $("#actionMaxTokens").on("input", function() {
+    $("#maxTokensValue").text($(this).val());
+  });
   
   // Toggle visibility of tools definition textarea based on checkbox
   $("#useTools").on("change", function() {
@@ -262,61 +267,69 @@ function loadActions(searchTerm = "") {
 
 // Preview action
 function previewAction(action) {
-  // Add defaults to prevent undefined errors
-  const title = action.title || "Untitled Action";
-  const description = action.description || "";
-  const tags = action.tags && Array.isArray(action.tags) ? action.tags : [];
-  const model = action.model || "gpt-3.5-turbo";
-  const purpose = action.purpose || "generate";
-  const temperature = action.temperature || "0.7";
-  const prompt = action.prompt || "";
-  
   let html = `
-    <h5>${title}</h5>
-    <p>${description || "<em>No description</em>"}</p>
-    
-    <div class="row mb-3">
-      <div class="col-md-4">
-        <strong>AI Model:</strong><br>
-        ${model}
-      </div>
-      <div class="col-md-4">
-        <strong>Purpose:</strong><br>
-        ${purpose}
-      </div>
-      <div class="col-md-4">
-        <strong>Web Search:</strong><br>
-        ${action.enablewebsearch ? "Enabled" : "Disabled"}
-      </div>
-      <div class="col-md-4">
-        <strong>Temperature:</strong><br>
-        ${temperature}
+    <div class="card-header">${action.title}
+      <div class="btn-group float-right">
+        <button class="btn btn-sm btn-warning action-btn" id="editActionBtn">Edit</button>
+        <button class="btn btn-sm btn-danger action-btn" id="deleteActionBtn">Delete</button>
       </div>
     </div>
-    
-    <div class="mb-3">
-      <strong>Tags:</strong><br>
-      ${tags.length > 0 ? 
-        tags.map(t => `<span class="badge badge-info mr-1">${t}</span>`).join("") : 
-        "<em>No tags</em>"}
-    </div>
-    
-    <div>
-      <strong>Prompt Template:</strong>
-      <pre class="bg-light p-2 border rounded">${prompt}</pre>
+    <div class="card-body">
+      <p>${action.description || "<em>No description</em>"}</p>
+      
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <strong>AI Model:</strong><br>
+          ${action.model || "gpt-3.5-turbo"}
+        </div>
+        <div class="col-md-4">
+          <strong>Purpose:</strong><br>
+          ${action.purpose || "generate"}
+        </div>
+        <div class="col-md-4">
+          <strong>Web Search:</strong><br>
+          ${action.enablewebsearch ? "Enabled" : "Disabled"}
+        </div>
+        <div class="col-md-4">
+          <strong>Temperature:</strong><br>
+          ${action.temperature || "0.7"}
+        </div>
+        <div class="col-md-4">
+          <strong>Max Tokens:</strong><br>
+          ${action.maxTokens || "1000"}
+        </div>
+      </div>
+      
+      <div class="mb-3">
+        <strong>Tags:</strong><br>
+        ${action.tags && action.tags.length ? 
+          action.tags.map(t => `<span class="badge badge-info mr-1">${t}</span>`).join("") : 
+          "<em>No tags</em>"}
+      </div>
+      
+      <div>
+        <strong>Prompt Template:</strong>
+        <pre class="bg-light p-2 border rounded">${action.prompt}</pre>
+      </div>
     </div>
   `;
   
   $("#actionPreview").html(html);
+  $("#runActionBtn").prop("disabled", false);
+  $("#runActionBtn").data("action-id", action.id);
   
-  // Enable both buttons and store the selected action ID
+  //edit and delete buttons
+  $("#editActionBtn").off("click").on("click", function(e) {
+    e.stopPropagation();
+    editAction(action);
+  });
+
+  $("#deleteActionBtn").off("click").on("click", function(e) {
+    e.stopPropagation();
+    deleteAction(action.id);
+  });
+  
   selectedActionId = action.id;
-  console.log("Action selected, ID:", selectedActionId);
-  $("#selectContentBtn").prop("disabled", false);
-  $("#runActionBtn").prop("disabled", false).removeClass("btn-success").addClass("btn-primary").text("Run Action");
-  
-  // Re-initialize buttons to ensure they're bound with the current actionId
-  initializeActionButtons();
 }
 
 // Edit action - also add defensive checks here
@@ -333,6 +346,11 @@ function editAction(action) {
   $("#actionPurpose").val(action.purpose || "generate");
   $("#actionTemperature").val(action.temperature || "0.7");
   $("#tempValue").text(action.temperature || "0.7");
+
+  // Set max_tokens if available, otherwise use default
+  $("#actionMaxTokens").val(action.maxTokens || "1000");  // Add this line
+  $("#maxTokensValue").text(action.maxTokens || "1000");  // Add this line
+
   $("#enableWebSearch").prop("checked", action.enablewebsearch || false);
 
   // Set the Use Tools checkbox and Tools Definition textarea
@@ -341,6 +359,10 @@ function editAction(action) {
 
   $("#actionPrompt").val(action.prompt || "");
   $("#saveActionBtn").text("Update Action");
+
+   // focus on the title field
+   $("#actionForm").show();
+   $("#actionTitle").focus();
 }
 
 // Delete action
@@ -363,6 +385,7 @@ function resetActionForm() {
   editingActionId = null;
   $("#actionForm")[0].reset();
   $("#tempValue").text("0.7"); // Reset temperature display
+  $("#maxTokensValue").text("1000");  // Add this line
   $("#saveActionBtn").text("Save Action");
   $("#actionPreview").html('<p class="text-muted">Select an action to preview its settings and prompt template.</p>');
   $("#runActionBtn").prop("disabled", true).removeClass("btn-success").addClass("btn-primary").text("Run Action");
@@ -382,7 +405,14 @@ function handleActionFormSubmit(e) {
   const useTools = $("#useTools").is(":checked") ? true : false;
   const toolsDefinition = $("#toolsDefinition").val().trim();
   const temperature = $("#actionTemperature").val();
+  const maxTokens = $("#actionMaxTokens").val(); // Add this
+
   const prompt = $("#actionPrompt").val().trim();
+
+  if (!db) {
+    Helpers.showNotification("Database not available. Please refresh the page.", "danger");
+    return;
+  }
   
   const transaction = db.transaction("actions", "readwrite");
   const store = transaction.objectStore("actions");
@@ -396,6 +426,7 @@ function handleActionFormSubmit(e) {
       action.model = model;
       action.purpose = purpose;
       action.temperature = temperature;
+      action.maxTokens = maxTokens;
       action.enablewebsearch = enablewebsearch;
       action.useTools = useTools;
       action.toolsDefinition = toolsDefinition;
@@ -403,7 +434,7 @@ function handleActionFormSubmit(e) {
       action.updated = new Date();
       
       store.put(action).onsuccess = function() {
-        showNotification("Action updated successfully!");
+        Helpers.showNotification("Action updated successfully!");
         resetActionForm();
         loadActions();
       };
@@ -416,15 +447,17 @@ function handleActionFormSubmit(e) {
       model,
       purpose,
       temperature,
+      maxTokens,
       enablewebsearch,
       useTools,
       toolsDefinition,
       prompt,
-      created: new Date()
+      created: new Date(),
+      history: [],
     };
     
     store.add(action).onsuccess = function() {
-      showNotification("New action created!");
+      Helpers.showNotification("New action created!");
       resetActionForm();
       loadActions();
     };
@@ -1236,7 +1269,7 @@ async function callOpenAiApi(prompt, action, content) {
         { role: "user", content: content }
       ],
       temperature: parseFloat(action.temperature) || 0.7,
-      max_tokens: 800
+      maxTokens: action.maxTokens ? parseInt(action.maxTokens) : 800
     };
     
     // Add web search option if the model supports it
@@ -1456,4 +1489,36 @@ function saveResultAsParagraph(text) {
   
   // Show notification
   showNotification("Results added as a new paragraph!", "success");
+}
+
+
+/**
+ * Save a record of an action run in history
+ * @param {number} actionId - The action ID
+ * @param {Object} runData - The run data to save
+ */
+function saveActionRunHistory(actionId, runData) {
+  if (!db) return;
+  
+  const transaction = db.transaction("actions", "readwrite");
+  const store = transaction.objectStore("actions");
+  
+  store.get(actionId).onsuccess = function(e) {
+    const action = e.target.result;
+    if (action) {
+      // Initialize history array if it doesn't exist
+      if (!action.history) {
+        action.history = [];
+      }
+      
+      // Add the new run to history (limit to last 10 runs)
+      action.history.unshift(runData);
+      if (action.history.length > 10) {
+        action.history = action.history.slice(0, 10);
+      }
+      
+      // Update the action
+      store.put(action);
+    }
+  };
 }

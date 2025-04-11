@@ -580,10 +580,13 @@ function previewDocument(doc) {
     
     const paragraphPreview = createContentPreview(p.content, {
       title: paragraphTitle,
-      showControls: false,
+      showControls: true,
       additionalFooterContent: additionalContent,
-      containerClass: "paragraph-content-container"
+      containerClass: "paragraph-content-container",
+      allowCopy: false
     });
+
+    console.log("Paragraph preview:", paragraphPreview);
     
     paragraphContainer.append(paragraphPreview);
     

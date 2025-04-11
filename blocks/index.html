@@ -364,18 +364,19 @@
       </div>
 
 <!-- Enhanced Dashboard View -->
+<!-- Enhanced Dashboard View -->
 <div class="tab-pane fade" id="dashboardView" role="tabpanel">
   <!-- Welcome banner with introduction -->
   <div class="jumbotron mb-4 dashboard-jumbotron">
     <h2>Welcome to Markdown Note System</h2>
-    <p class="lead">Your integrated environment for organizing technical content with the power of AI</p>
-    <p>Organize blocks of content, create references, build documents, and automate workflows</p>
+    <p class="lead">Your integrated environment for organizing technical content</p>
+    <p>Organize blocks of content, create references, build documents, and manage your knowledge base</p>
     <button class="btn btn-info" data-toggle="modal" data-target="#helpModal"><i class="fas fa-question-circle"></i> Help Guide</button>
   </div>
 
   <div class="row mb-4">
     <!-- Universal Search -->
-    <div class="col-md-7">
+    <div class="col-md-8">
       <div class="card shadow-sm universal-search-container">
         <div class="card-header bg-transparent border-0">
           <h5><i class="fas fa-search"></i> Universal Search</h5>
@@ -410,7 +411,7 @@
     </div>
 
     <!-- Quick Stats -->
-    <div class="col-md-5">
+    <div class="col-md-4">
       <div class="card shadow-sm">
         <div class="card-header bg-transparent stats-card-header">
           <h5><i class="fas fa-chart-pie"></i> System Overview</h5>
@@ -449,121 +450,61 @@
         </div>
       </div>
 
-          <div class="card shadow-sm">
-            <div class="card-header bg-transparent">
-              <h5><i class="fas fa-bolt"></i> Quick Actions</h5>
+      <!-- Simplified Quick Actions -->
+      <div class="card shadow-sm mt-3">
+        <div class="card-header bg-transparent">
+          <h5><i class="fas fa-bolt"></i> Quick Actions</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <button class="btn btn-block quick-action-btn primary" id="quickAddBlock">
+                <span class="icon"><i class="fas fa-cube"></i></span>
+                <span class="text">Add Block</span>
+              </button>
+              
+              <button class="btn btn-block quick-action-btn success" id="quickAddDocument">
+                <span class="icon"><i class="fas fa-file-alt"></i></span>
+                <span class="text">New Document</span>
+              </button>
             </div>
-            <div class="card-body">
-              <div class="row">
-                <div class="col-md-6">
-                  <button class="btn btn-block quick-action-btn primary" id="quickAddBlock">
-                    <span class="icon"><i class="fas fa-cube"></i></span>
-                    <span class="text">Add New Block</span>
-                  </button>
-                  
-                  <button class="btn btn-block quick-action-btn success" id="quickAddDocument">
-                    <span class="icon"><i class="fas fa-file-alt"></i></span>
-                    <span class="text">Create Document</span>
-                  </button>
-                  
-                  <button class="btn btn-block quick-action-btn warning" id="quickAddReference">
-                    <span class="icon"><i class="fas fa-bookmark"></i></span>
-                    <span class="text">Add Reference</span>
-                  </button>
-                </div>
-                <div class="col-md-6">
-                  <button class="btn btn-block quick-action-btn info" id="quickAddAction">
-                    <span class="icon"><i class="fas fa-robot"></i></span>
-                    <span class="text">Create Action</span>
-                  </button>
-                  
-                  <button class="btn btn-block quick-action-btn secondary" id="quickAddWorkflow">
-                    <span class="icon"><i class="fas fa-cogs"></i></span>
-                    <span class="text">Create Workflow</span>
-                  </button>
-                  
-                  <button class="btn btn-block quick-action-btn danger" id="quickExportData">
-                    <span class="icon"><i class="fas fa-download"></i></span>
-                    <span class="text">Export Data</span>
-                  </button>
-                </div>
-              </div>
+            <div class="col-md-6">
+                <button class="btn btn-block quick-action-btn info" id="quickAIAssistant">
+                <span class="icon"><i class="fas fa-robot"></i></span>
+                <span class="text">AI assistant</span>
+                </button>
+
+                <button class="btn btn-block quick-action-btn warning" id="quickAddReference">
+                  <span class="icon"><i class="fas fa-bookmark"></i></span>
+                  <span class="text">Add Reference</span>
+                </button>
+            </div>
+            <div class="col-md-6">
+
+              
+              <button class="btn btn-block quick-action-btn danger" id="quickExportData">
+                <span class="icon"><i class="fas fa-download"></i></span>
+                <span class="text">Export Data</span>
+              </button>
             </div>
           </div>
-    
-        <!-- Recently Accessed -->
-          <div class="card shadow-sm">
-            <div class="card-header bg-transparent">
-              <h5><i class="fas fa-history"></i> Recent Activity</h5>
-            </div>
-            <div class="card-body p-0">
-              <ul class="list-group list-group-flush" id="recentActivityList">
-                <li class="list-group-item text-muted text-center">No recent activity to show</li>
-                <!-- Recent items will be populated here dynamically -->
-              </ul>
-            </div>
-          </div>
-
-
+        </div>
+      </div>
     </div>
-    
-
   </div>
 
-  <!-- Dashboard AI Actions Panel HTML -->
-<!-- Add this to the dashboard section in index.html -->
-
-  <!-- Tags Content (Moved from the original Tags view) -->
+  <!-- Tag Cloud Section (Simplified) -->
   <div class="row">
     <div class="col-md-12">
       <div class="card shadow-sm">
         <div class="card-header bg-transparent">
-          <h5><i class="fas fa-tags"></i> Tag Management</h5>
+          <h5><i class="fas fa-tags"></i> Popular Tags</h5>
         </div>
         <div class="card-body">
           <div class="row">
-            <div class="col-md-3">
-              <div class="input-group mb-3">
-                <input type="text" id="tagSearch" class="form-control" placeholder="Search tags...">
-                <div class="input-group-append">
-                  <button class="btn btn-primary" id="searchTagBtn">Search</button>
-                </div>
-              </div>
-
-              <!-- Tag Tree -->
-              <div id="tagTreeContainer" class="mb-4"></div>
-              
-              <h6 class="font-weight-bold border-bottom pb-2">Popular Tags</h6>
-              <div id="tagCloud" class="mb-4"></div>
-            </div>
-            
-            <div class="col-md-9">
-              <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                  <span>Content Tagged with: <span id="selectedTagName" class="font-weight-bold">All Tags</span></span>
-                  <span class="badge badge-primary badge-pill" id="taggedItemCount">0</span>
-                </div>
-                <ul class="nav nav-tabs" id="tagContentTabs" role="tablist">
-                  <li class="nav-item">
-                    <a class="nav-link active" id="tag-blocks-tab" data-toggle="tab" href="#tagBlocksContent" role="tab">
-                      <i class="fas fa-cube"></i> Blocks
-                    </a>
-                  </li>
-                  <li class="nav-item">
-                    <a class="nav-link" id="tag-documents-tab" data-toggle="tab" href="#tagDocumentsContent" role="tab">
-                      <i class="fas fa-file-alt"></i> Documents
-                    </a>
-                  </li>
-                </ul>
-                <div class="tab-content border border-top-0 p-3">
-                  <div class="tab-pane fade show active" id="tagBlocksContent" role="tabpanel">
-                    <div id="taggedBlocksList"></div>
-                  </div>
-                  <div class="tab-pane fade" id="tagDocumentsContent" role="tabpanel">
-                    <div id="taggedDocumentsList"></div>
-                  </div>
-                </div>
-              </div>
+            <div class="col-md-12">
+              <div id="tagCloud" class="mb-2"></div>
+              <p class="text-muted small text-center">Click on a tag to view related content</p>
             </div>
           </div>
         </div>
@@ -673,6 +614,13 @@
                       </small>
                     </div>
                     <div class="form-group">
+                      <label for="actionMaxTokens">Max Tokens: <span id="maxTokensValue">1000</span></label>
+                      <input type="range" class="form-control-range" id="actionMaxTokens" min="100" max="4000" step="100" value="1000">
+                      <small class="form-text text-muted">
+                        Controls the maximum length of the generated text. Higher values allow for longer outputs but may increase processing time.
+                      </small>
+                    </div>
+                    <div class="form-group">
                       <label for="actionPrompt" class="required-field">Prompt Template</label>
                       <div class="help-tip mb-2">
                         <p>Use <code>{content}</code> as placeholder for the input content</p>
@@ -690,69 +638,114 @@
       </div>
 
       <!-- Workflows View -->
-      <div class="tab-pane fade" id="workflowsView" role="tabpanel">
-        <div class="row">
-          <div class="col-md-3">
-            <div class="mb-2">
-              <input type="text" id="workflowSearch" class="form-control" placeholder="Search workflows...">
-              <small class="form-text text-muted">Search by name or description</small>
-            </div>
-            <div class="section-title">Saved Workflows</div>
-            <ul id="workflowList" class="list-group"></ul>
-          </div>
-          <div class="col-md-5 preview-col">
-            <div class="card mb-4">
-              <div class="card-header">Workflow Preview</div>
-              <div class="card-body">
-                <div id="workflowPreview" class="border p-3">
-                  <p class="text-muted">Select a workflow to preview its steps and configuration.</p>
-                </div>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-header">Workflow Testing</div>
-              <div class="card-body">
-                
-                
-                <div id="workflowResultContainer" class="mt-3">
-                  <div class="alert alert-info">Results will appear here after running the workflow.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-4 editor-col">
-            <div class="card mb-4">
-              <div class="card-header">Workflow Configuration</div>
-              <div class="card-body">
-                <div class="help-tip mb-3">
-                  <p><strong>What are Workflows?</strong> Workflows are sequences of actions that can be run together. Create pipelines of AI operations to process your content.</p>
-                </div>
-                <form id="workflowForm">
-                  <div class="form-group">
-                    <label for="workflowName" class="required-field">Workflow Name</label>
-                    <input type="text" class="form-control" id="workflowName" required>
-                  </div>
-                  <div class="form-group">
-                    <label for="workflowDesc">Description</label>
-                    <textarea class="form-control" id="workflowDesc" rows="2"></textarea>
-                  </div>
-                  <div class="form-group">
-                    <label for="workflowSteps">Workflow Steps</label>
-                    <div id="workflowSteps" class="border rounded p-2 mb-2">
-                      <!-- Steps will be added here -->
-                    </div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="addWorkflowStepBtn">
-                      <i class="fas fa-plus"></i> Add Step
-                    </button>
-                  </div>
-                  <button type="submit" id="saveWorkflowBtn" class="btn btn-primary">Save Workflow</button>
-                  <button type="button" id="cancelWorkflowBtn" class="btn btn-secondary">Clear</button>
-                </form>
+     <!-- Simplified Workflow View -->
+<!-- Simplified Workflows View -->
+<div class="tab-pane fade" id="workflowsView" role="tabpanel">
+  <div class="row">
+    <div class="col-md-3">
+      <div class="mb-2">
+        <button id="addWorkflowBtn" class="btn btn-primary btn-block mt-3">Add New Workflow</button>
+      </div>
+      <div class="mb-2">
+        <input type="text" id="workflowSearch" class="form-control" placeholder="Search workflows...">
+        <small class="form-text text-muted">Search by name or description</small>
+      </div>
+      <div class="section-title">Saved Workflows</div>
+      <ul id="workflowList" class="list-group"></ul>
+    </div>
+    <div class="col-md-9">
+      <div class="row">
+        <div class="col-md-12">
+          <div class="card mb-4">
+            <div class="card-header">Workflow Preview</div>
+            <div class="card-body">
+              <div id="workflowPreview" class="border p-3">
+                <p class="text-muted">Select a workflow to preview its steps and configuration.</p>
               </div>
             </div>
           </div>
         </div>
       </div>
+      <div class="row">
+        <div class="col-md-12">
+          <div class="card">
+            <div class="card-header">Workflow Results</div>
+            <div class="card-body">
+              <div id="workflowResultContainer" class="mt-3">
+                <div class="alert alert-info">Results will appear here after running the workflow.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-12">
+          <div class="card mt-4">
+            <div class="card-header">Workflow Creation</div>
+            <div class="card-body">
+              <div class="help-tip mb-3">
+                <p><strong>What are Workflows?</strong> Workflows are sequences of actions that can be run together. Create pipelines of AI operations to process your content.</p>
+              </div>
+              <form id="workflowForm">
+                <div class="form-group">
+                  <label for="workflowName" class="required-field">Workflow Name</label>
+                  <input type="text" class="form-control" id="workflowName" required>
+                </div>
+                <div class="form-group">
+                  <label for="workflowDesc">Description</label>
+                  <textarea class="form-control" id="workflowDesc" rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                  <label>Workflow Steps</label>
+                  <div id="workflowSteps" class="border rounded p-2 mb-2">
+                    <!-- Steps will be added here -->
+                  </div>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" id="addWorkflowStepBtn">
+                    <i class="fas fa-plus"></i> Add Step
+                  </button>
+                </div>
+                <button type="submit" id="saveWorkflowBtn" class="btn btn-primary">Save Workflow</button>
+                <button type="button" id="cancelWorkflowBtn" class="btn btn-secondary">Clear</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- Workflow CSS -->
+<style>
+  /* Workflow styling */
+  .workflow-step {
+    position: relative;
+    padding: 15px;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    margin-bottom: 15px;
+    background-color: #f8f9fa;
+  }
+  
+  .workflow-step .remove-step-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+  }
+  
+  /* Results styling */
+  .workflow-results .final-result {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  
+  /* Tag select styling */
+  #workflow-tags {
+    height: 150px;
+  }
+</style>
 
       <!-- Settings View -->
       <div class="tab-pane fade" id="settingsView" role="tabpanel">
@@ -813,6 +806,7 @@
   </div>
 
   <!-- Modals -->
+
 <!-- Updated Help Modal HTML - Replace the existing help modal in index.html -->
 <div class="modal fade" id="helpModal" tabindex="-1" role="dialog">
   <div class="modal-dialog modal-lg" role="document">

@@ -230,6 +230,11 @@ function registerEventHandlers() {
   $("#actionTemperature").on("input", function() {
     $("#tempValue").text($(this).val());
   });
+
+  // Add this new handler for max tokens slider
+$("#actionMaxTokens").on("input", function() {
+  $("#maxTokensValue").text($(this).val());
+});
   
   // Tools toggle
   $("#useTools").on("change", function() {
@@ -403,3 +408,141 @@ function handleImportConfirm() {
   
   $("#importOptionsModal").modal("hide");
 }
+
+/**
+ * Integration code for the enhanced workflows system
+ * Add this to the end of main.js or in a separate file loaded after main.js
+ */
+
+// Workflow button event handlers
+function initializeWorkflowHandlers() {
+  // Add new workflow button
+  $("#addWorkflowBtn").on("click", function() {
+    resetWorkflowForm();
+    $("#workflowForm").show();
+    $("#workflowName").focus();
+  });
+  
+  // Navigate between workflow execution steps
+  $("#previous-step-btn").on("click", function() {
+    const currentStep = parseInt($("#workflow-execution-modal").data("current-step"));
+    if (currentStep > 0) {
+      navigateWorkflowStep(currentStep - 1);
+    }
+  });
+  
+  $("#next-step-btn").on("click", function() {
+    const currentStep = parseInt($("#workflow-execution-modal").data("current-step"));
+    const totalSteps = parseInt($("#workflow-execution-modal").data("total-steps"));
+    
+    if (currentStep < totalSteps - 1) {
+      // Move to next step
+      navigateWorkflowStep(currentStep + 1);
+    } else {
+      // This is the last step, complete the workflow
+      completeWorkflowExecution();
+    }
+  });
+  
+  // Configure run type handlers
+  $(document).on("click", ".configure-workflow-btn", function() {
+    const workflowId = $(this).data("workflow-id");
+    configureAndRunWorkflow(workflowId);
+  });
+  
+  $(document).on("click", ".run-workflow-direct-btn", function() {
+    const workflowId = $(this).data("workflow-id");
+    runWorkflowWithSavedConfig(workflowId);
+  });
+  
+  // Input source type radio buttons
+  $(document).on("change", 'input[name="sourceType"]', function() {
+    const sourceType = $(this).val();
+    $('.source-config').addClass('d-none');
+    
+    if (sourceType === 'tag') {
+      $('#tag-config').removeClass('d-none');
+    } else if (sourceType === 'document') {
+      $('#document-config').removeClass('d-none');
+    } else if (sourceType === 'reference') {
+      $('#reference-config').removeClass('d-none');
+    }
+  });
+}
+
+/**
+ * Navigate between steps in the workflow execution modal
+ * @param {number} stepIndex - The step index to navigate to
+ */
+function navigateWorkflowStep(stepIndex) {
+  const modal = $("#workflow-execution-modal");
+  const workflow = modal.data("current-workflow");
+  const totalSteps = workflow.steps.length;
+  
+  // Update current step
+  modal.data("current-step", stepIndex);
+  
+  // Update buttons
+  $("#previous-step-btn").prop("disabled", stepIndex === 0);
+  
+  if (stepIndex === totalSteps - 1) {
+    // Last step
+    $("#next-step-btn").text("Complete Workflow");
+  } else {
+    $("#next-step-btn").text("Next Step");
+  }
+  
+  // Update step display
+  $(".workflow-execution-step").removeClass("active");
+  $(`.workflow-execution-step[data-step-index="${stepIndex}"]`).addClass("active");
+  
+  // Scroll to active step
+  const activeStep = $(`.workflow-execution-step[data-step-index="${stepIndex}"]`);
+  if (activeStep.length) {
+    modal.find(".modal-body").animate({
+      scrollTop: activeStep.position().top
+    }, 300);
+  }
+}
+
+/**
+ * Complete the workflow execution
+ */
+function completeWorkflowExecution() {
+  const modal = $("#workflow-execution-modal");
+  const workflow = modal.data("current-workflow");
+  const allStepResults = modal.data("step-results") || [];
+  const finalContent = modal.data("final-content") || "";
+  
+  // Close execution modal
+  modal.modal("hide");
+  
+  // Show results
+  displayWorkflowResults(allStepResults, finalContent);
+  
+  // Update workflow with last run information
+  saveWorkflowRunResults(workflow, allStepResults, finalContent);
+  
+  // Show notification
+  Helpers.showNotification("Workflow execution completed successfully!", "success");
+}
+
+// Initialize when document is ready
+$(document).ready(function() {
+  // Initialize the workflow handlers
+  initializeWorkflowHandlers();
+  
+  // Register the original event handlers defined in workflow.js
+  try {
+    // Add step button
+    $("#addWorkflowStepBtn").on("click", addWorkflowStep);
+    
+    // Cancel button
+    $("#cancelWorkflowBtn").on("click", resetWorkflowForm);
+    
+    // Form submission
+    $("#workflowForm").on("submit", handleWorkflowFormSubmit);
+  } catch(error) {
+    console.error("Error registering workflow event handlers:", error);
+  }
+});

@@ -1,6 +1,5 @@
 /**
  * Actions management module
- * Updated to use the Helpers module pattern
  */
 
 /**
@@ -80,6 +79,10 @@ function previewAction(action) {
           <strong>Temperature:</strong><br>
           ${action.temperature || "0.7"}
         </div>
+        <div class="col-md-4">
+  <strong>Max Tokens:</strong><br>
+  ${action.maxTokens || "1000"}
+</div>
       </div>
       
       <div class="mb-3">
@@ -127,6 +130,8 @@ function editAction(action) {
   $("#actionPurpose").val(action.purpose || "generate");
   $("#actionTemperature").val(action.temperature || "0.7");
   $("#tempValue").text(action.temperature || "0.7");
+  $("#actionMaxTokens").val(action.maxTokens || "1000");
+  $("#maxTokensValue").text(action.maxTokens || "1000");
   $("#enableWebSearch").prop("checked", action.enablewebsearch || false);
 
   $("#useTools").prop("checked", action.useTools || false).trigger("change");
@@ -144,32 +149,23 @@ function editAction(action) {
  * @param {number} id - The action ID to delete
  */
 function deleteAction(id) {
-  Helpers.confirm({
-    title: "Delete Action",
-    message: "Are you sure you want to delete this action? This cannot be undone.",
-    confirmButtonClass: "btn-danger",
-    confirmText: "Delete"
-  }).then(confirmed => {
-    if(confirmed) {
-      if (!db) {
-        Helpers.showNotification("Database not available. Please refresh the page.", "danger");
-        return;
-      }
-      
-      Helpers.db.deleteById("actions", id)
-        .then(() => {
-          loadActions();
-          Helpers.showNotification("Action deleted successfully!");
-          if (editingActionId === id) {
-            resetActionForm();
-          }
-        })
-        .catch(error => {
-          console.error("Error deleting action:", error);
-          Helpers.showNotification("Failed to delete action: " + error.message, "danger");
-        });
+  if (confirm("Are you sure you want to delete this action?")) {
+    if (!db) {
+      showNotification("Database not available. Please refresh the page.", "danger");
+      return;
     }
-  });
+    
+    const transaction = db.transaction("actions", "readwrite");
+    const store = transaction.objectStore("actions");
+    
+    store.delete(id).onsuccess = function() {
+      loadActions();
+      showNotification("Action deleted successfully!");
+      if (editingActionId === id) {
+        resetActionForm();
+      }
+    };
+  }
 }
 
 /**
@@ -200,10 +196,11 @@ function handleActionFormSubmit(e) {
   const useTools = $("#useTools").is(":checked") ? true : false;
   const toolsDefinition = $("#toolsDefinition").val().trim();
   const temperature = $("#actionTemperature").val();
+  const maxTokens = $("#actionMaxTokens").val();
   const prompt = $("#actionPrompt").val().trim();
   
   if (!db) {
-    Helpers.showNotification("Database not available. Please refresh the page.", "danger");
+    showNotification("Database not available. Please refresh the page.", "danger");
     return;
   }
   
@@ -219,6 +216,7 @@ function handleActionFormSubmit(e) {
       action.model = model;
       action.purpose = purpose;
       action.temperature = temperature;
+      action.maxTokens = maxTokens;
       action.enablewebsearch = enablewebsearch;
       action.useTools = useTools;
       action.toolsDefinition = toolsDefinition;
@@ -226,7 +224,7 @@ function handleActionFormSubmit(e) {
       action.updated = new Date();
       
       store.put(action).onsuccess = function() {
-        Helpers.showNotification("Action updated successfully!");
+        showNotification("Action updated successfully!");
         resetActionForm();
         loadActions();
       };
@@ -239,6 +237,7 @@ function handleActionFormSubmit(e) {
       model,
       purpose,
       temperature,
+      maxTokens,
       enablewebsearch,
       useTools,
       toolsDefinition,
@@ -247,7 +246,7 @@ function handleActionFormSubmit(e) {
     };
     
     store.add(action).onsuccess = function() {
-      Helpers.showNotification("New action created!");
+      showNotification("New action created!");
       resetActionForm();
       loadActions();
     };
@@ -262,57 +261,61 @@ function prepareActionExecution() {
   const actionId = selectedActionId;
   
   if (!actionId) {
-    Helpers.showNotification("Please select an action first", "warning");
+    showNotification("Please select an action first", "warning");
     return;
   }
   
   if (!db) {
-    Helpers.showNotification("Database not available. Please refresh the page.", "danger");
+    showNotification("Database not available. Please refresh the page.", "danger");
     return;
   }
   
-  Helpers.db.getById("actions", actionId)
-    .then(action => {
-      selectedContentItems = [];
-      updateSelectedItemsUI();
-      
-      let selectionInfo = "";
-      let selectionMode = "multiple";
-      
-      switch(action.purpose) {
-        case "modify":
-          selectionInfo = "Select zero or one block/paragraph to modify.";
-          selectionMode = "single";
-          break;
-        case "generate":
-          selectionInfo = "Select zero or multiple blocks/paragraphs as reference for generation.";
-          selectionMode = "multiple";
-          break;
-        case "analyze":
-        case "synthesize":
-          selectionInfo = "Select one or multiple blocks/paragraphs to " + action.purpose + ".";
-          selectionMode = "multiple-required";
-          break;
-        default:
-          selectionInfo = "Select content to process with this action.";
-      }
-      
-      $(".action-selection-info").text(selectionInfo);
-      $("#contentSelectionModal").data("selection-mode", selectionMode);
-      
-      // Reset any existing tabs and load fresh content
-      loadBlocksForSelection();
-      loadDocumentsForSelection();
-      loadTagsForSelection();
-      loadReferencesForSelection();
-      
-      // Enable the selection modal
-      $("#contentSelectionModal").modal("show");
-    })
-    .catch(error => {
-      console.error("Error getting action:", error);
-      Helpers.showNotification("Error loading action: " + error.message, "danger");
-    });
+  const transaction = db.transaction("actions", "readonly");
+  const store = transaction.objectStore("actions");
+  
+  store.get(parseInt(actionId)).onsuccess = function(e) {
+    const action = e.target.result;
+    if (!action) {
+      showNotification("Action not found", "danger");
+      return;
+    }
+    
+    selectedContentItems = [];
+    updateSelectedItemsUI();
+    
+    let selectionInfo = "";
+    let selectionMode = "multiple";
+    
+    switch(action.purpose) {
+      case "modify":
+        selectionInfo = "Select zero or one block/paragraph to modify.";
+        selectionMode = "single";
+        break;
+      case "generate":
+        selectionInfo = "Select zero or multiple blocks/paragraphs as reference for generation.";
+        selectionMode = "multiple";
+        break;
+      case "analyze":
+      case "synthesize":
+        selectionInfo = "Select one or multiple blocks/paragraphs to " + action.purpose + ".";
+        selectionMode = "multiple-required";
+        break;
+      default:
+        selectionInfo = "Select content to process with this action.";
+    }
+    
+    $(".action-selection-info").text(selectionInfo);
+    $("#contentSelectionModal").data("selection-mode", selectionMode);
+    
+    // Reset any existing tabs and load fresh content
+    loadBlocksForSelection();
+    loadDocumentsForSelection();
+    loadTagsForSelection();
+    loadReferencesForSelection();
+    
+    // Enable the selection modal
+    $("#contentSelectionModal").modal("show");
+  };
 }
 
 /**
@@ -345,7 +348,7 @@ function loadBlocksForSelection(searchTerm = "") {
       
       if (!searchTerm || searchableText.indexOf(searchTerm.toLowerCase()) !== -1) {
         const title = block.title || "Block " + block.id;
-        const preview = Helpers.truncate(block.text, 100);
+        const preview = block.text.length > 100 ? block.text.substring(0, 100) + "..." : block.text;
         
         blocksHtml += `
           <div class="card mb-2 selectable-block" data-id="${block.id}" data-type="block" data-title="${title}">
@@ -401,9 +404,283 @@ function loadBlocksForSelection(searchTerm = "") {
   };
 }
 
-// Many more helper functions in this file...
-// Truncated for brevity - the rest of the file would be similarly updated
-// to use the Helpers module for UI operations, database operations, etc.
+/**
+ * Load documents for selection
+ * @param {string} searchTerm - Optional search term
+ */
+function loadDocumentsForSelection(searchTerm = "") {
+  const docsList = $(".document-selection-list");
+  docsList.html('<div class="text-center py-3"><i class="fas fa-spinner fa-spin"></i> Loading documents...</div>');
+  
+  if (!db) {
+    docsList.html('<p class="text-danger">Database not available. Please refresh the page.</p>');
+    return;
+  }
+  
+  const transaction = db.transaction("documents", "readonly");
+  const store = transaction.objectStore("documents");
+  let docsHtml = '';
+  
+  store.openCursor().onsuccess = function(e) {
+    const cursor = e.target.result;
+    if (cursor) {
+      const doc = cursor.value;
+      const searchableText = doc.title.toLowerCase();
+      
+      if (!searchTerm || searchableText.indexOf(searchTerm.toLowerCase()) !== -1) {
+        docsHtml += `
+          <div class="card mb-2 selectable-document" data-id="${doc.id}" data-title="${doc.title}">
+            <div class="card-body py-2">
+              <strong>${doc.title}</strong> <small class="text-muted">(ID: ${doc.id})</small>
+              <button class="btn btn-sm btn-outline-primary float-right load-paragraphs-btn">
+                Show Paragraphs
+              </button>
+            </div>
+          </div>
+        `;
+      }
+      cursor.continue();
+    } else {
+      if (docsHtml) {
+        docsList.html(docsHtml);
+        
+        $(".load-paragraphs-btn").on("click", function() {
+          const docId = $(this).closest(".selectable-document").data("id");
+          loadParagraphsForSelection(docId);
+        });
+        
+      } else {
+        docsList.html('<p class="text-center text-muted">No documents found matching your search.</p>');
+      }
+    }
+  };
+}
+
+/**
+ * Load paragraphs for selection
+ * @param {number} docId - The document ID
+ */
+function loadParagraphsForSelection(docId) {
+  const paragraphsList = $(".paragraph-selection-list");
+  paragraphsList.html('<div class="text-center py-3"><i class="fas fa-spinner fa-spin"></i> Loading paragraphs...</div>');
+  
+  if (!db) {
+    paragraphsList.html('<p class="text-danger">Database not available. Please refresh the page.</p>');
+    return;
+  }
+  
+  const transaction = db.transaction("documents", "readonly");
+  const store = transaction.objectStore("documents");
+  
+  store.get(parseInt(docId)).onsuccess = function(e) {
+    const doc = e.target.result;
+    if (doc && doc.paragraphs) {
+      let paragraphsHtml = '';
+      
+      doc.paragraphs.forEach((para, index) => {
+        const preview = para.content.length > 100 ? para.content.substring(0, 100) + "..." : para.content;
+        
+        paragraphsHtml += `
+          <div class="card mb-2 selectable-paragraph" data-id="${doc.id}-${index}" data-doc-id="${doc.id}" 
+               data-para-index="${index}" data-doc-title="${doc.title}" data-type="paragraph">
+            <div class="card-body py-2">
+              <div class="form-check">
+                <input class="form-check-input select-content-item" type="checkbox" id="para-${doc.id}-${index}">
+                <label class="form-check-label w-100" for="para-${doc.id}-${index}">
+                  <strong>Paragraph ${index + 1}</strong> <small class="text-muted">(Document: ${doc.title})</small><br>
+                  <small>${preview}</small>
+                  ${para.tags && para.tags.length ? 
+                    `<div class="mt-1">${para.tags.map(t => `<span class="badge badge-info">${t}</span>`).join(' ')}</div>` : ''}
+                </label>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      
+      paragraphsList.html(paragraphsHtml);
+      
+      $(".selectable-paragraph .select-content-item").on("change", function() {
+        const paragraph = $(this).closest(".selectable-paragraph");
+        const docId = paragraph.data("doc-id");
+        const paraIndex = paragraph.data("para-index");
+        const docTitle = paragraph.data("doc-title");
+        const itemId = `${docId}-${paraIndex}`;
+        const selectionMode = $("#contentSelectionModal").data("selection-mode");
+        
+        if ($(this).prop("checked")) {
+          if (selectionMode === "single" && selectedContentItems.length > 0) {
+            $(".select-content-item").not(this).prop("checked", false);
+            selectedContentItems = [];
+          }
+          
+          selectedContentItems.push({
+            id: itemId,
+            docId: docId,
+            paraIndex: paraIndex,
+            type: "paragraph",
+            title: `Paragraph ${paraIndex + 1} from ${docTitle}`
+          });
+        } else {
+          selectedContentItems = selectedContentItems.filter(item => 
+            !(item.type === "paragraph" && item.id === itemId)
+          );
+        }
+        
+        updateSelectedItemsUI();
+      });
+    } else {
+      paragraphsList.html('<p class="text-center text-muted">No paragraphs found in this document.</p>');
+    }
+  };
+}
+
+/**
+ * Load references for selection
+ * @param {string} searchTerm - Optional search term
+ */
+function loadReferencesForSelection(searchTerm = "") {
+  const referencesList = $(".reference-selection-list");
+  referencesList.html('<div class="text-center py-3"><i class="fas fa-spinner fa-spin"></i> Loading references...</div>');
+  
+  if (!db) {
+    referencesList.html('<p class="text-danger">Database not available. Please refresh the page.</p>');
+    return;
+  }
+  
+  const transaction = db.transaction("references", "readonly");
+  const store = transaction.objectStore("references");
+  let referencesHtml = '';
+  
+  store.openCursor().onsuccess = function(e) {
+    const cursor = e.target.result;
+    if (cursor) {
+      const reference = cursor.value;
+      const searchableText = (reference.id + " " + reference.name + " " + (reference.description || "")).toLowerCase();
+      
+      if (!searchTerm || searchableText.indexOf(searchTerm.toLowerCase()) !== -1) {
+        referencesHtml += `
+          <div class="card mb-2 selectable-reference" data-id="${reference.id}" data-name="${reference.name}">
+            <div class="card-body py-2">
+              <strong>${reference.id}</strong> - ${reference.name}
+              ${reference.type ? `<span class="badge badge-secondary ml-1">${reference.type}</span>` : ''}
+            </div>
+          </div>
+        `;
+      }
+      cursor.continue();
+    } else {
+      if (referencesHtml) {
+        referencesList.html(referencesHtml);
+        
+        $(".selectable-reference").click(function() {
+          $(".selectable-reference").removeClass("active");
+          $(this).addClass("active");
+          
+          const referenceId = $(this).data("id");
+          loadBlocksForReference(referenceId);
+        });
+      } else {
+        referencesList.html('<p class="text-center text-muted">No references found matching your search.</p>');
+      }
+    }
+  };
+}
+
+/**
+ * Load blocks for a reference
+ * @param {string} referenceId - The reference ID
+ */
+function loadBlocksForReference(referenceId) {
+  const blocksList = $(".reference-blocks-list");
+  blocksList.html('<div class="text-center py-3"><i class="fas fa-spinner fa-spin"></i> Loading blocks...</div>');
+  
+  if (!db) {
+    blocksList.html('<p class="text-danger">Database not available. Please refresh the page.</p>');
+    return;
+  }
+  
+  const transaction = db.transaction("blocks", "readonly");
+  const store = transaction.objectStore("blocks");
+  const blocksForReference = [];
+  
+  store.openCursor().onsuccess = function(e) {
+    const cursor = e.target.result;
+    if (cursor) {
+      const block = cursor.value;
+      if (block.reference === referenceId) {
+        blocksForReference.push(block);
+      }
+      cursor.continue();
+    } else {
+      // Sort blocks by reference levels
+      blocksForReference.sort((a, b) => {
+        let al = a.refLevels || [];
+        let bl = b.refLevels || [];
+        for(let i = 0; i < Math.max(al.length, bl.length); i++){
+          let av = al[i] || 0;
+          let bv = bl[i] || 0;
+          if(av !== bv) return av - bv;
+        }
+        return 0;
+      });
+      
+      if (blocksForReference.length > 0) {
+        let blocksHtml = '';
+        
+        blocksForReference.forEach(block => {
+          const levelStr = block.refLevels && block.refLevels.length > 0 ? 
+            block.refLevels.join(".") + " - " : '';
+          const preview = block.text.length > 100 ? block.text.substring(0, 100) + "..." : block.text;
+          
+          blocksHtml += `
+            <div class="card mb-2 selectable-ref-block" data-id="${block.id}" data-type="block" data-title="${block.title || 'Block ' + block.id}">
+              <div class="card-body py-2">
+                <div class="form-check">
+                  <input class="form-check-input select-content-item" type="checkbox" id="ref-block-${block.id}">
+                  <label class="form-check-label w-100" for="ref-block-${block.id}">
+                    <strong>${levelStr}${block.title || 'Block ' + block.id}</strong> <small class="text-muted">(ID: ${block.id})</small><br>
+                    <small>${preview}</small>
+                  </label>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+        
+        blocksList.html(blocksHtml);
+        
+        $(".selectable-ref-block .select-content-item").change(function() {
+          const block = $(this).closest(".selectable-ref-block");
+          const blockId = parseInt(block.data("id"));
+          const blockTitle = block.data("title");
+          const selectionMode = $("#contentSelectionModal").data("selection-mode");
+          
+          if ($(this).prop("checked")) {
+            if (selectionMode === "single" && selectedContentItems.length > 0) {
+              $(".select-content-item").not(this).prop("checked", false);
+              selectedContentItems = [];
+            }
+            
+            selectedContentItems.push({
+              id: blockId,
+              type: "block",
+              title: blockTitle
+            });
+          } else {
+            selectedContentItems = selectedContentItems.filter(item => 
+              !(item.type === "block" && item.id === blockId)
+            );
+          }
+          
+          updateSelectedItemsUI();
+        });
+      } else {
+        blocksList.html('<p class="text-center text-muted">No blocks found for this reference.</p>');
+      }
+    }
+  };
+}
 
 /**
  * Update the selected items UI
@@ -460,79 +737,69 @@ async function assembleContentFromSelectedItems() {
   for (const item of selectedContentItems) {
     if (item.type === "block") {
       blockFetchPromises.push(
-        Helpers.db.getById("blocks", item.id)
-          .then(block => {
-            if (block) {
-              const blockText = `## ${block.title || 'Block ' + block.id}\n${block.text}`;
-              return {
-                id: block.id,
-                text: blockText,
-                originalBlock: block
-              };
-            }
-          })
-          .catch(error => {
-            console.error(`Error fetching block with ID ${item.id}:`, error);
-            return null;
-          })
+        fetchBlockById(item.id).then(block => {
+          if (block) {
+            const blockText = `## ${block.title || 'Block ' + block.id}\n${block.text}`;
+            return {
+              id: block.id,
+              text: blockText,
+              originalBlock: block
+            };
+          } else {
+            throw new Error(`Block with ID ${item.id} not found`);
+          }
+        })
       );
     } else if (item.type === "paragraph") {
       paragraphFetchPromises.push(
-        Helpers.db.getById("documents", item.docId)
-          .then(doc => {
-            if (doc && doc.paragraphs && doc.paragraphs[item.paraIndex]) {
-              const para = doc.paragraphs[item.paraIndex];
-              const paraText = `## Paragraph ${parseInt(item.paraIndex) + 1} from ${doc.title}\n${para.content}`;
-              
-              const blockRefs = para.blockRefs || (para.blockRef ? [para.blockRef] : []);
-              const refBlockPromises = blockRefs.map(blockId => 
-                Helpers.db.getById("blocks", blockId)
-                  .then(refBlock => {
-                    if (refBlock) {
-                      return {
-                        id: refBlock.id,
-                        text: `### Referenced Block: ${refBlock.title || 'Block ' + refBlock.id}\n${refBlock.text}`,
-                        originalBlock: refBlock
-                      };
-                    }
-                    return null;
-                  })
-                  .catch(() => null)
-              );
-              
-              return Promise.all(refBlockPromises).then(refBlocks => {
-                const filteredRefBlocks = refBlocks.filter(b => b !== null);
-                return {
-                  id: item.id,
-                  text: paraText,
-                  refBlocks: filteredRefBlocks
-                };
-              });
-            }
+        fetchDocumentById(item.docId).then(doc => {
+          if (doc && doc.paragraphs && doc.paragraphs[item.paraIndex]) {
+            const para = doc.paragraphs[item.paraIndex];
+            const paraText = `## Paragraph ${parseInt(item.paraIndex) + 1} from ${doc.title}\n${para.content}`;
+            
+            const blockRefs = para.blockRefs || (para.blockRef ? [para.blockRef] : []);
+            const refBlockPromises = blockRefs.map(blockId => 
+              fetchBlockById(parseInt(blockId)).then(refBlock => {
+                if (refBlock) {
+                  return {
+                    id: refBlock.id,
+                    text: `### Referenced Block: ${refBlock.title || 'Block ' + refBlock.id}\n${refBlock.text}`,
+                    originalBlock: refBlock
+                  };
+                } else {
+                  return null;
+                }
+              }).catch(() => null)
+            );
+            
+            return Promise.all(refBlockPromises).then(refBlocks => {
+              const filteredRefBlocks = refBlocks.filter(b => b !== null);
+              return {
+                id: item.id,
+                text: paraText,
+                refBlocks: filteredRefBlocks
+              };
+            });
+          } else {
             throw new Error(`Paragraph not found in document ${item.docId}`);
-          })
-          .catch(error => {
-            console.error(`Error fetching paragraph:`, error);
-            return null;
-          })
+          }
+        })
       );
     }
   }
   
   const blocks = await Promise.all(blockFetchPromises);
   for (const block of blocks) {
-    if (block) contentParts.push(block.text);
+    contentParts.push(block.text);
   }
   
   const paragraphs = await Promise.all(paragraphFetchPromises);
   for (const para of paragraphs) {
-    if (para) {
-      contentParts.push(para.text);
-      
-      if (para.refBlocks && para.refBlocks.length) {
-        for (const refBlock of para.refBlocks) {
-          contentParts.push(refBlock.text);
-        }
+    contentParts.push(para.text);
+    
+    if (para.refBlocks && para.refBlocks.length) {
+      for (const refBlock of para.refBlocks) {
+        contentParts.push(refBlock.text);
       }
     }
   }
@@ -552,81 +819,80 @@ async function assembleContentFromSelectedItems() {
  */
 function runActionWithContent(actionId, content) {
   if (!db) {
-    Helpers.showNotification("Database not available. Please refresh the page.", "danger");
+    showNotification("Database not available. Please refresh the page.", "danger");
     return;
   }
   
-  Helpers.db.getById("actions", actionId)
-    .then(action => {
-      const contentPreview = Helpers.createContentPreview(content, {
-        title: "Content Preview",
-        additionalHeaderContent: '<small class="text-muted ml-2">Content to be processed</small>',
-        containerClass: "card mb-3",
-        maxHeight: 300
+  const transaction = db.transaction("actions", "readonly");
+  const store = transaction.objectStore("actions");
+  
+  store.get(parseInt(actionId)).onsuccess = function(e) {
+    const action = e.target.result;
+    if (!action) {
+      $("#actionResultContainer").html('<div class="alert alert-danger">Action not found</div>');
+      return;
+    }
+    
+    const contentPreview = createContentPreview(content, {
+      title: "Content Preview",
+      additionalHeaderContent: '<small class="text-muted ml-2">Content to be processed</small>',
+      containerClass: "card mb-3",
+      maxHeight: 300
+    });
+
+    
+    const processedPrompt = action.prompt.replace(/{content}/g, content || "");
+    
+    if (!openaiApiKey) {
+      $("#actionResultContainer").html(`
+        <div class="alert alert-warning">
+          <strong>API Key Missing!</strong> Please add your OpenAI API key in the Settings tab to use this feature.
+        </div>
+      `);
+      return;
+    }
+    
+    $("#actionResultContainer").html('');
+    $("#actionResultContainer").append(contentPreview);
+    $("#actionResultContainer").append('<div class="text-center my-3"><i class="fas fa-spinner fa-spin"></i> Processing your request...</div>');
+    
+    callOpenAiApi(action, processedPrompt).then(response => {
+      $("#actionResultContainer").find('.text-center').remove();
+      const resultPreview = createContentPreview(response, {
+        title: "Result",
+        containerClass: "card",
+        additionalFooterContent: `
+          <div class="mt-2">
+            <button class="btn btn-sm btn-outline-primary copy-result-btn">
+              <i class="fas fa-copy"></i> Copy Results
+            </button>
+            <button class="btn btn-sm btn-outline-success save-as-paragraph-btn">
+              <i class="fas fa-save"></i> Save as Paragraph
+            </button>
+          </div>
+        `
       });
       
-      const processedPrompt = action.prompt.replace(/{content}/g, content || "");
+      $("#actionResultContainer").append(resultPreview);
+      $("#actionResultContainer").data("raw-result", response);
       
-      if (!openaiApiKey) {
-        $("#actionResultContainer").html(`
-          <div class="alert alert-warning">
-            <strong>API Key Missing!</strong> Please add your OpenAI API key in the Settings tab to use this feature.
-          </div>
-        `);
-        return;
-      }
+      // Add event handlers for the buttons
+      resultPreview.find(".copy-result-btn").click(function() {
+        copyTextToClipboard(response);
+      });
       
-      $("#actionResultContainer").html('');
-      $("#actionResultContainer").append(contentPreview);
-      $("#actionResultContainer").append('<div class="text-center my-3"><i class="fas fa-spinner fa-spin"></i> Processing your request...</div>');
-      
-      Helpers.callOpenAiApi(action, processedPrompt)
-        .then(response => {
-          $("#actionResultContainer").find('.text-center').remove();
-          const resultPreview = Helpers.createContentPreview(response, {
-            title: "Result",
-            containerClass: "card",
-            additionalFooterContent: `
-              <div class="mt-2">
-                <button class="btn btn-sm btn-outline-primary copy-result-btn">
-                  <i class="fas fa-copy"></i> Copy Results
-                </button>
-                <button class="btn btn-sm btn-outline-success save-as-paragraph-btn">
-                  <i class="fas fa-save"></i> Save as Paragraph
-                </button>
-              </div>
-            `
-          });
-          
-          $("#actionResultContainer").append(resultPreview);
-          $("#actionResultContainer").data("raw-result", response);
-          
-          // Add event handlers for the buttons
-          resultPreview.find(".copy-result-btn").click(function() {
-            Helpers.copyTextToClipboard(response);
-          });
-          
-          resultPreview.find(".save-as-paragraph-btn").click(function() {
-            saveResultAsParagraph(response);
-          });
-        })
-        .catch(error => {
-          $("#actionResultContainer").find('.text-center').remove();
-          $("#actionResultContainer").append(`
-            <div class="alert alert-danger">
-              <strong>Error:</strong> ${error.message || error}
-            </div>
-          `);
-        });
-    })
-    .catch(error => {
-      console.error("Error getting action:", error);
-      $("#actionResultContainer").html(`
+      resultPreview.find(".save-as-paragraph-btn").click(function() {
+        saveResultAsParagraph(response);
+      });
+    }).catch(error => {
+      $("#actionResultContainer").find('.text-center').remove();
+      $("#actionResultContainer").append(`
         <div class="alert alert-danger">
-          <strong>Error:</strong> Action not found or database error: ${error.message}
+          <strong>Error:</strong> ${error.message || error}
         </div>
       `);
     });
+  };
 }
 
 $(document).ready(function() {
@@ -636,7 +902,7 @@ $(document).ready(function() {
     if (selectedContentItems.length === 0) {
       const selectionMode = $("#contentSelectionModal").data("selection-mode");
       if (selectionMode === "multiple-required" || selectionMode === "single-required") {
-        Helpers.showNotification("Please select at least one item", "warning");
+        showNotification("Please select at least one item", "warning");
         return;
       }
     }

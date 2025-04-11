@@ -444,8 +444,8 @@ window.Helpers = {};
             { role: "user", content: prompt }
           ],
           temperature: parseFloat(action.temperature) || 0.7,
-          max_tokens: 800
-        };
+          max_tokens: parseInt(action.maxTokens) || 1000 // Add this line or update existing line
+                  };
         
         if (action.enablewebsearch) {
           payload.web_search_options = {};
