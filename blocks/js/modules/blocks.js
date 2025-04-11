@@ -290,8 +290,7 @@ function showBlockDetails(block) {
   
   const contentPreview = createContentPreview(block.text, {
     showControls: false, // No controls needed here
-    additionalFooterContent: additionalContent,
-    renderMermaidDiagrams: true
+    additionalFooterContent: additionalContent
   });
   
   // Add the block content
@@ -311,15 +310,94 @@ function showBlockDetails(block) {
   $("#blockDetailView").append(headerCard, referencesCard);
   
   // Set up event handlers
-  $(".delete-block-btn").on("click", function(e) {
+  headerCard.find(".delete-block-btn").on("click", function(e) {
     e.stopPropagation(); 
     deleteBlock(block.id);
   });
   
-  $(".edit-block-btn").on("click", function() {
+  headerCard.find(".edit-block-btn").on("click", function() {
     editBlockUniversal($(this).data("block-id"));
   });
   
-  // Continue with loading references...
-  findParagraphsReferencingBlock(block.id).then(/* ... */);
+  // Now find paragraphs that reference this block
+  findParagraphsReferencingBlock(block.id).then(references => {
+    const refList = $("#referencingParagraphsList");
+    
+    if (references.length === 0) {
+      refList.html('<p class="text-muted">No paragraphs are referencing this block.</p>');
+      return;
+    }
+    
+    // Clear the loading indicator
+    refList.empty();
+    
+    // Create a container for references
+    const referencesContainer = $('<div class="references-container"></div>');
+    refList.append(referencesContainer);
+    
+    // Add each reference
+    references.forEach(ref => {
+      // Create reference card
+      const refCard = $(`
+        <div class="mb-3 reference-item">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+              <strong>Document:</strong> ${ref.docTitle} 
+              <br><strong>Paragraph:</strong> ${ref.paraIndex + 1}
+            </div>
+            <button class="btn btn-sm btn-outline-primary view-document-btn" 
+                    data-doc-id="${ref.docId}" data-para-index="${ref.paraIndex}">
+              <i class="fas fa-eye"></i> View
+            </button>
+          </div>
+        </div>
+      `);
+      
+      // Create preview for the paragraph content
+      const paragraphPreview = createContentPreview(ref.content, {
+        showControls: false,
+        containerClass: "paragraph-reference-preview"
+      });
+      
+      // Add the preview to the card
+      refCard.append(paragraphPreview);
+      
+      // Add the card to the container
+      referencesContainer.append(refCard);
+      
+      // Add click handler for view button
+      refCard.find(".view-document-btn").click(function() {
+        const docId = $(this).data("doc-id");
+        const paraIndex = $(this).data("para-index");
+        
+        // Load and display the document
+        fetchDocumentById(docId).then(doc => {
+          if (doc) {
+            previewDocument(doc);
+            $("#blockDetailView").hide();
+            // Switch to the documents tab
+            $('#viewTabs a[href="#documentsView"]').tab('show');
+            
+            // Highlight the referenced paragraph
+            setTimeout(() => {
+              const paraElement = $("#docPreviewContent .paragraph-container").eq(paraIndex);
+              if (paraElement.length) {
+                paraElement.addClass("highlight-paragraph");
+                $('html, body').animate({
+                  scrollTop: paraElement.offset().top - 100
+                }, 500);
+                setTimeout(() => paraElement.removeClass("highlight-paragraph"), 120000);
+              }
+            }, 500);
+          }
+        }).catch(error => {
+          console.error("Error fetching document:", error);
+          showNotification("Error loading document: " + error.message, "danger");
+        });
+      });
+    });
+  }).catch(error => {
+    console.error("Error finding referencing paragraphs:", error);
+    $("#referencingParagraphsList").html('<p class="text-danger">Error loading references: ' + error.message + '</p>');
+  });
 }
