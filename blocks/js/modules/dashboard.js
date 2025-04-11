@@ -174,3 +174,150 @@ function initializeQuickActions() {
   });
 
 }
+
+/**
+ * Update the tag cloud with interactive tags
+ * @param {Object} tagCounts - Object with tag names as keys and counts as values
+ */
+function updateTagCloud(tagCounts) {
+  const tagCloud = $("#tagCloud");
+  tagCloud.empty();
+  
+  // Sort tags by frequency
+  const sortedTags = Object.keys(tagCounts).sort((a, b) => tagCounts[b] - tagCounts[a]);
+  
+  // Display top 20 tags
+  sortedTags.slice(0, 20).forEach(tag => {
+    const count = tagCounts[tag];
+    // Scale font size between 1em and 2em based on frequency
+    const fontSize = 1 + (count / Math.max(...Object.values(tagCounts))) * 1;
+    
+    const tagBtn = $(`<button class="btn btn-outline-info m-1 dashboard-tag-btn">${tag} <span class="badge badge-light">${count}</span></button>`);
+    tagBtn.css('font-size', `${fontSize}em`);
+    tagBtn.data('tag', tag);
+    
+    tagCloud.append(tagBtn);
+  });
+  
+  // Add click handlers for the tags
+  $(".dashboard-tag-btn").click(function() {
+    const tag = $(this).data('tag');
+    loadTagContentForDashboard(tag);
+  });
+  
+  // Add close button handler for tag results
+  $("#closeTagResults").click(function() {
+    $("#dashboardTagResults").hide();
+  });
+}
+
+/**
+ * Load tag content specifically for the dashboard view
+ * @param {string} tag - The tag to load content for
+ */
+function loadTagContentForDashboard(tag) {
+  // Update the selected tag title
+  $("#selectedTagTitle span").text(tag);
+  
+  // Show the results container
+  $("#dashboardTagResults").show();
+  
+  // Show loading indicators
+  $("#dashboardTaggedBlocks").html('<div class="text-center py-3"><i class="fas fa-spinner fa-spin"></i> Loading blocks...</div>');
+  $("#dashboardTaggedDocuments").html('<div class="text-center py-3"><i class="fas fa-spinner fa-spin"></i> Loading documents...</div>');
+  
+  // Use the SearchHelper to find content with this tag
+  SearchHelper.searchByTag(tag)
+    .then(results => {
+      // Update tab counts
+      $("#tag-blocks-tab .badge").text(results.blocks.length);
+      $("#tag-documents-tab .badge").text(results.documents.length);
+      
+      // Render blocks
+      if (results.blocks.length === 0) {
+        $("#dashboardTaggedBlocks").html('<div class="alert alert-info">No blocks found with this tag.</div>');
+      } else {
+        let blocksHtml = '';
+        results.blocks.forEach(result => {
+          const block = result.item;
+          blocksHtml += `
+            <div class="card mb-2">
+              <div class="card-body">
+                <h6>${block.title || 'Block ' + block.id}</h6>
+                <p>${Helpers.truncate(block.text, 150)}</p>
+                <div class="d-flex justify-content-between">
+                  <div>
+                    ${block.tags.map(t => `<span class="badge badge-info mr-1">${t}</span>`).join('')}
+                  </div>
+                  <button class="btn btn-sm btn-primary view-block-btn" data-block-id="${block.id}">
+                    <i class="fas fa-eye"></i> View
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+        $("#dashboardTaggedBlocks").html(blocksHtml);
+        
+        // Add click handlers for view buttons
+        $("#dashboardTaggedBlocks .view-block-btn").click(function() {
+          const blockId = $(this).data('block-id');
+          $('#blocks-tab').tab('show');
+          setTimeout(() => {
+            fetchBlockById(parseInt(blockId))
+              .then(block => {
+                if (block) {
+                  showBlockDetails(block);
+                }
+              })
+              .catch(error => {
+                console.error("Error fetching block:", error);
+              });
+          }, 300);
+        });
+      }
+      
+      // Render documents
+      if (results.documents.length === 0) {
+        $("#dashboardTaggedDocuments").html('<div class="alert alert-info">No documents found with this tag.</div>');
+      } else {
+        let docsHtml = '';
+        results.documents.forEach(result => {
+          const doc = result.item;
+          docsHtml += `
+            <div class="card mb-2">
+              <div class="card-body">
+                <h6>${doc.title}</h6>
+                <button class="btn btn-sm btn-primary view-doc-btn" data-doc-id="${doc.id}">
+                  <i class="fas fa-eye"></i> View Document
+                </button>
+              </div>
+            </div>
+          `;
+        });
+        $("#dashboardTaggedDocuments").html(docsHtml);
+        
+        // Add click handlers for view buttons
+        $("#dashboardTaggedDocuments .view-doc-btn").click(function() {
+          const docId = $(this).data('doc-id');
+          $('#documents-tab').tab('show');
+          setTimeout(() => {
+            fetchDocumentById(parseInt(docId))
+              .then(doc => {
+                if (doc) {
+                  previewDocument(doc);
+                }
+              })
+              .catch(error => {
+                console.error("Error fetching document:", error);
+              });
+          }, 300);
+        });
+      }
+    })
+    .catch(error => {
+      console.error("Error loading tag content:", error);
+      $("#dashboardTaggedBlocks").html('<div class="alert alert-danger">Error loading blocks: ' + error.message + '</div>');
+      $("#dashboardTaggedDocuments").html('<div class="alert alert-danger">Error loading documents: ' + error.message + '</div>');
+    });
+}

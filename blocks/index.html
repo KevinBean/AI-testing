@@ -495,7 +495,7 @@
 
   <!-- Tag Cloud Section (Simplified) -->
   <div class="row">
-    <div class="col-md-12">
+    <div class="col-md-5">
       <div class="card shadow-sm">
         <div class="card-header bg-transparent">
           <h5><i class="fas fa-tags"></i> Popular Tags</h5>
@@ -510,7 +510,42 @@
         </div>
       </div>
     </div>
+
+    <div id="dashboardTagResults" class="col-md-7" style="display:none;">
+      <div class="card shadow-sm">
+        <div class="card-header bg-transparent">
+          <h5 id="selectedTagTitle"><i class="fas fa-tag"></i> Content Tagged with: <span></span></h5>
+          <button class="btn btn-sm btn-outline-secondary float-right" id="closeTagResults">
+            <i class="fas fa-times"></i> Close
+          </button>
+        </div>
+        <div class="card-body">
+          <ul class="nav nav-tabs" id="tagContentTabs" role="tablist">
+            <li class="nav-item">
+              <a class="nav-link active" id="tag-blocks-tab" data-toggle="tab" href="#tagBlocksContent" role="tab">
+                <i class="fas fa-cube"></i> Blocks <span class="badge badge-light">0</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="tag-documents-tab" data-toggle="tab" href="#tagDocumentsContent" role="tab">
+                <i class="fas fa-file-alt"></i> Documents <span class="badge badge-light">0</span>
+              </a>
+            </li>
+          </ul>
+          <div class="tab-content mt-3">
+            <div class="tab-pane fade show active" id="tagBlocksContent" role="tabpanel">
+              <div id="dashboardTaggedBlocks"></div>
+            </div>
+            <div class="tab-pane fade" id="tagDocumentsContent" role="tabpanel">
+              <div id="dashboardTaggedDocuments"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
+
+
 </div>
 
 

@@ -34,7 +34,7 @@ function updateTagAutocomplete() {
       cursor.continue();
     } else {
       // After counting all tags, update the tag visualizations
-      updateTagVisualization(tagCounts);
+      updateTagCloud(tagCounts);
       
       // Set the tag autocomplete
       $("#tagSearch").autocomplete({
