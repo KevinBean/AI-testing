@@ -70,51 +70,60 @@ console.log("DEBUG: Initializing conversations module...");
  * Load saved conversations
  */
 function loadConversations(searchTerm = "") {
-  $("#conversationList").empty();
+    $("#conversationList").empty();
+    
+    if (!db) return;
+    
+    const transaction = db.transaction("conversations", "readonly");
+    const store = transaction.objectStore("conversations");
+    const index = store.index("updated");
+    
+    // Use reverse direction to get newest first
+    const request = index.openCursor(null, "prev");
+    
+    request.onsuccess = function(e) {
+      const cursor = e.target.result;
+      if (cursor) {
+        const conversation = cursor.value;
+        const searchText = conversation.title.toLowerCase();
+        
+        if (!searchTerm || searchText.includes(searchTerm.toLowerCase())) {
+          const lastMessage = conversation.messages.length > 0 
+            ? conversation.messages[conversation.messages.length - 1] 
+            : { content: "No messages yet" };
   
-    // Wait for database to be available
-    if (!window.db) {
-        console.log("DEBUG: Database not available yet, will retry in 1 second");
-        setTimeout(loadConversations, 1000);
-        return;
+          const date = Helpers.formatRelativeDate(conversation.updated);
+          
+          const item = $(`<li class="list-group-item list-item conversation-item" data-id="${conversation.id}">
+            <div class="d-flex justify-content-between align-items-center">
+              <strong>${conversation.title}</strong>
+              <small>${date}</small>
+            </div>
+            <p class="text-muted small">${Helpers.truncate(lastMessage.content, 60)}</p>
+          </li>`);
+          
+          item.click(function() {
+            loadConversation(conversation.id);
+          });
+          
+          // Add delete button to the item
+          addDeleteButtonToConversationItem(item, conversation.id);
+          
+          $("#conversationList").append(item);
+        }
+        
+        cursor.continue();
+      } else if ($("#conversationList").children().length === 0) {
+        // No conversations found
+        $("#conversationList").append(`
+          <li class="list-group-item text-center text-muted">
+            <i class="fas fa-comments"></i> No conversations found
+            ${searchTerm ? " matching your search" : ""}
+          </li>
+        `);
       }
-  
-  const transaction = db.transaction("conversations", "readonly");
-  const store = transaction.objectStore("conversations");
-  const index = store.index("updated");
-  
-  // Use reverse direction to get newest first
-  const request = index.openCursor(null, "prev");
-  
-  request.onsuccess = function(e) {
-    const cursor = e.target.result;
-    if (cursor) {
-      const conversation = cursor.value;
-      const searchText = conversation.title.toLowerCase();
-      
-      if (!searchTerm || searchText.includes(searchTerm.toLowerCase())) {
-        const lastMessage = conversation.messages[conversation.messages.length - 1];
-        const date = Helpers.formatRelativeDate(conversation.updated);
-        
-        const item = $(`<li class="list-group-item list-item conversation-item" data-id="${conversation.id}">
-          <div class="d-flex justify-content-between">
-            <strong>${conversation.title}</strong>
-            <small>${date}</small>
-          </div>
-          <p class="text-muted small">${Helpers.truncate(lastMessage.content, 60)}</p>
-        </li>`);
-        
-        item.click(function() {
-          loadConversation(conversation.id);
-        });
-        
-        $("#conversationList").append(item);
-      }
-      
-      cursor.continue();
-    }
-  };
-}
+    };
+  }
 
 /**
  * Start a new empty conversation
@@ -210,29 +219,36 @@ function loadConversation(id) {
 /**
  * Display a conversation in the UI
  */
+/**
+ * Display a conversation in the UI with save button
+ * Replace your existing displayConversation function with this one
+ */
 function displayConversation(conversation) {
-  // Set title
-  $("#conversationTitle").text(conversation.title);
-  
-  // Display messages
-  const messagesContainer = $("#conversationMessages");
-  messagesContainer.empty();
-  
-  conversation.messages.forEach(message => {
-    const messageElement = createMessageElement(message);
-    messagesContainer.append(messageElement);
-  });
-  
-  // Scroll to bottom
-  messagesContainer.scrollTop(messagesContainer[0].scrollHeight);
-  
-  // Enable input
-  $("#conversationInputContainer").show();
-  $("#conversationInput").focus();
-  
-  // Switch to conversations tab if not already active
-  $('#conversations-tab').tab('show');
-}
+    // Set title
+    $("#conversationTitle").text(conversation.title);
+    
+    // Display messages
+    const messagesContainer = $("#conversationMessages");
+    messagesContainer.empty();
+    
+    conversation.messages.forEach(message => {
+      const messageElement = createMessageElement(message);
+      messagesContainer.append(messageElement);
+    });
+    
+    // Scroll to bottom
+    messagesContainer.scrollTop(messagesContainer[0].scrollHeight);
+    
+    // Enable input
+    $("#conversationInputContainer").show();
+    $("#conversationInput").focus();
+    
+    // Add save button
+    addSaveConversationButton();
+    
+    // Switch to conversations tab if not already active
+    $('#conversations-tab').tab('show');
+  }
 
 /**
  * Create a message element for display
@@ -387,9 +403,8 @@ function generateResponse() {
     const lastMessage = conversation.messages[conversation.messages.length - 1];
     console.log(`DEBUG: Last message:`, lastMessage);
     if (lastMessage.sender !== "user") {
-        console.log(`DEBUG: Last message is not from user, skipping response`);
-        return; // Don't respond to assistant messages
-
+      console.log(`DEBUG: Last message is not from user, skipping response`);
+      return; // Don't respond to assistant messages
     }
     
     // Check if an action is specified
@@ -407,8 +422,8 @@ function generateResponse() {
     $("#conversationMessages").append(loadingElement);
     $("#conversationMessages").scrollTop($("#conversationMessages")[0].scrollHeight);
     
-    // Get conversation context
-    const context = prepareConversationContext(conversation);
+    // Get FULL conversation context, not just recent messages
+    const context = prepareFullConversationContext(conversation);
     
     // If using an action, call it with the context
     if (actionId) {
@@ -422,14 +437,22 @@ function generateResponse() {
           return;
         }
         
-        // Prepare prompt with context
-        const prompt = action.prompt.replace(/{content}/g, context);
+        // Prepare prompt with context, including conversation title and purpose
+        const prompt = `
+Conversation title: ${conversation.title}
 
-            // Before calling OpenAI API
-    console.log(`DEBUG: About to call OpenAI API`);
+The following is a conversation history. Please respond to the last message from the user as if you are continuing this conversation. You are a helpful assistant knowledgeable about note-taking and knowledge management.
+
+Conversation history:
+${context}`;
+
+        // Inject the prompt into the action's template
+        const finalPrompt = action.prompt.replace(/{content}/g, prompt);
+
+        console.log(`DEBUG: About to call OpenAI API`);
         
         // Call OpenAI API
-        callOpenAiApi(action, prompt)
+        callOpenAiApi(action, finalPrompt)
           .then(response => {
             handleResponse(response, actionId);
           })
@@ -444,11 +467,16 @@ function generateResponse() {
         model: "gpt-3.5-turbo"
       };
       
-      // Create a simple prompt
-      const prompt = `User's message: ${lastMessage.content}\n\nConversation context:\n${context}`;
+      // Create a more comprehensive prompt
+      const prompt = `
+Conversation title: ${conversation.title}
+
+The following is a conversation history. Please respond to the last message from the user as if you are continuing this conversation. You are a helpful assistant knowledgeable about note-taking and knowledge management.
+
+Conversation history:
+${context}`;
       
-    // Before calling OpenAI API
-    console.log(`DEBUG: About to call OpenAI API`);
+      console.log(`DEBUG: About to call OpenAI API`);
 
       // Call OpenAI API
       callOpenAiApi(defaultAction, prompt)
@@ -1107,5 +1135,237 @@ function getActionName(actionId) {
     } catch (error) {
       console.error("Error getting action name:", error);
       return "Action #" + actionId;
+    }
+  }
+
+  /**
+ * Prepare full conversation context including all messages
+ */
+function prepareFullConversationContext(conversation) {
+    // Include ALL messages, not just the last few
+    const allMessages = conversation.messages
+      .map(msg => `${msg.sender === "user" ? "User" : "Assistant"}: ${msg.content}`)
+      .join("\n\n");
+    
+    // Add referenced content
+    let referencedContent = "";
+    const referencedItems = [];
+    
+    // Collect all references from messages
+    conversation.messages.forEach(message => {
+      if (message.references && message.references.length) {
+        message.references.forEach(ref => {
+          if (!referencedItems.some(item => item.type === ref.type && item.id === ref.id)) {
+            referencedItems.push(ref);
+          }
+        });
+      }
+    });
+    
+    if (referencedItems.length) {
+      referencedContent = "\n\nReferenced content:\n";
+      referencedItems.forEach(ref => {
+        // Include the actual content if available
+        const contentText = ref.content ? `\n\n${ref.content}` : '';
+        referencedContent += `[${ref.type} ${ref.id}]: ${ref.title}${contentText}\n\n`;
+      });
+    }
+    
+    return allMessages + referencedContent;
+  }
+
+  /**
+ * Delete a conversation
+ * @param {number} conversationId - The ID of the conversation to delete
+ * @returns {Promise} A promise that resolves when deletion is complete
+ */
+function deleteConversation(conversationId) {
+    return new Promise((resolve, reject) => {
+      if (!db) {
+        reject(new Error("Database not available"));
+        return;
+      }
+      
+      const transaction = db.transaction("conversations", "readwrite");
+      const store = transaction.objectStore("conversations");
+      
+      const request = store.delete(parseInt(conversationId));
+      
+      request.onsuccess = function() {
+        // If the deleted conversation was active, clear the active conversation
+        if (activeConversationId === conversationId) {
+          activeConversationId = null;
+          $("#conversationTitle").text("Select or start a conversation");
+          $("#conversationMessages").empty();
+          $("#conversationInputContainer").hide();
+        }
+        
+        // Refresh the conversation list
+        loadConversations();
+        
+        Helpers.showNotification("Conversation deleted successfully", "success");
+        resolve();
+      };
+      
+      request.onerror = function(e) {
+        Helpers.showNotification("Error deleting conversation", "danger");
+        reject(e.target.error);
+      };
+    });
+  }
+  
+  /**
+   * Add delete functionality to conversation list items
+   * Add this to the loadConversations function after creating the item
+   */
+  function addDeleteButtonToConversationItem(item, conversationId) {
+    // Create delete button
+    const deleteBtn = $(`
+      <button class="btn btn-sm btn-outline-danger delete-conversation-btn">
+        <i class="fas fa-trash"></i>
+      </button>
+    `);
+    
+    // Add delete button to the item
+    const btnContainer = $('<div class="ml-auto btn-group"></div>');
+    btnContainer.append(deleteBtn);
+    item.find('.d-flex').append(btnContainer);
+    
+    // Set up delete button click handler
+    deleteBtn.on("click", function(e) {
+      e.stopPropagation(); // Prevent opening the conversation when clicking delete
+      
+      // Show confirmation dialog
+      Helpers.confirm({
+        title: "Delete Conversation",
+        message: "Are you sure you want to delete this conversation? This action cannot be undone.",
+        confirmButtonClass: "btn-danger",
+        confirmText: "Delete"
+      }).then(confirmed => {
+        if (confirmed) {
+          deleteConversation(conversationId);
+        }
+      });
+    });
+    
+    return item;
+  }
+
+  /**
+ * Save the current conversation with a new title
+ */
+function saveConversationWithNewTitle() {
+    if (!activeConversationId) {
+      Helpers.showNotification("No active conversation to save", "warning");
+      return;
+    }
+    
+    // Show a dialog to get the new title
+    const modal = $(`<div class="modal fade" id="saveConversationModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Save Conversation</h5>
+            <button type="button" class="close" data-dismiss="modal">&times;</button>
+          </div>
+          <div class="modal-body">
+            <form id="saveConversationForm">
+              <div class="form-group">
+                <label for="conversationTitle">Conversation Title</label>
+                <input type="text" class="form-control" id="conversationTitle" 
+                       placeholder="Enter a title for this conversation" required>
+              </div>
+              <div class="form-group">
+                <label for="conversationTags">Tags (optional)</label>
+                <input type="text" class="form-control" id="conversationTags" 
+                       placeholder="comma, separated, tags">
+                <small class="form-text text-muted">Add tags to help organize your conversations</small>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="confirmSaveConversation">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>`);
+    
+    // Add to body and show
+    $("body").append(modal);
+    modal.modal("show");
+    
+    // Set up the form submission
+    $("#confirmSaveConversation").click(function() {
+      const titleInput = $("#conversationTitle");
+      if (titleInput.length === 0) {
+        console.error("DEBUG: #conversationTitle input field not found in the DOM.");
+        return;
+      }
+      const title = titleInput.val().trim();
+      console.log(`DEBUG: Title entered: ${title}`);
+      const tags = $("#conversationTags").val().split(",").map(t => t.trim()).filter(t => t);
+      
+      if (!title) {
+        Helpers.showNotification("Please enter a title", "warning");
+        return;
+      }
+      
+      const transaction = db.transaction("conversations", "readwrite");
+      const store = transaction.objectStore("conversations");
+      
+      store.get(activeConversationId).onsuccess = function(e) {
+        const conversation = e.target.result;
+        if (!conversation) {
+          Helpers.showNotification("Conversation not found", "danger");
+          modal.modal("hide");
+          return;
+        }
+        
+        // Update conversation title and tags
+        conversation.title = title;
+        conversation.tags = tags;
+        conversation.updated = new Date();
+        
+        // Save the conversation
+        store.put(conversation).onsuccess = function() {
+          Helpers.showNotification("Conversation saved successfully", "success");
+          
+          // Update UI
+          $("#conversationTitle").text(title);
+          
+          // Refresh the conversation list
+          loadConversations();
+          
+          // Close the modal
+          modal.modal("hide");
+        };
+      };
+    });
+    
+    // Remove when hidden
+    modal.on("hidden.bs.modal", function() {
+      modal.remove();
+    });
+  }
+  
+  /**
+   * Add a button to save conversation in the conversation header
+   * Call this in the displayConversation function
+   */
+  function addSaveConversationButton() {
+    // Check if the button already exists
+    if ($("#saveConversationBtn").length === 0) {
+      const saveBtn = $(`
+        <button class="btn btn-sm btn-outline-primary ml-2" id="saveConversationBtn">
+          <i class="fas fa-save"></i> Save
+        </button>
+      `);
+      
+      // Add the button next to existing buttons
+      $("#exportConversationBtn").after(saveBtn);
+      
+      // Set up click handler
+      $("#saveConversationBtn").click(saveConversationWithNewTitle);
     }
   }
