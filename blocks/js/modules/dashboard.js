@@ -1961,8 +1961,8 @@ function initializeDashboardActions() {
         </button>
       </div>
       <div class="card-body">
-        <div class="alert alert-info" id="dashboardActionsInfo">
-          <i class="fas fa-info-circle mr-2"></i> Select an action and content to process, then run the action directly from the dashboard.
+        <div class="alert alert-warning" id="dashboardActionsInfo">
+          <i class="fas fa-info-circle mr-2"></i>Select an action and content to process, then run the action directly from the dashboard. Pay attention not to type in and select sensitive data as input.
         </div>
         
         <div class="form-group">
