@@ -317,60 +317,59 @@ function previewDocumentLive() {
     paragraphContainer.append(paragraphPreview);
     
     // Process block references if any
-    if (blockRefs.length > 0) {
-      const blockRefsContainer = $(`<div class="block-references-container"></div>`);
-      paragraphContainer.append(blockRefsContainer);
+    // if (blockRefs.length > 0) {
+    //   const blockRefsContainer = $(`<div class="block-references-container"></div>`);
+    //   paragraphContainer.append(blockRefsContainer);
       
-      // Process each block reference
-      blockRefs.forEach(blockRef => {
-        blockRefsContainer.append(`<p><em>Block Reference: ${blockRef}</em></p>`);
+    //   // Process each block reference
+    //   blockRefs.forEach(blockRef => {
+    //     blockRefsContainer.append(`<p><em>Block Reference: ${blockRef}</em></p>`);
         
-        // Add a placeholder while we fetch the block
-        const blockPlaceholder = $(`<div class="block-placeholder-${blockRef}">
-          <div class="text-center">
-            <i class="fas fa-spinner fa-spin"></i> Loading block...
-          </div>
-        </div>`);
-        blockRefsContainer.append(blockPlaceholder);
+    //     // Add a placeholder while we fetch the block
+    //     const blockPlaceholder = $(`<div class="block-placeholder-${blockRef}">
+    //       <div class="text-center">
+    //         <i class="fas fa-spinner fa-spin"></i> Loading block...
+    //       </div>
+    //     </div>`);
+    //     blockRefsContainer.append(blockPlaceholder);
         
-        // Fetch and display the block
-        fetchBlockById(blockRef)
-          .then(block => {
-            if (block) {
-              // Create additional content with reference info
-              const blockAdditionalContent = `
-                ${block.reference ? `<span class="block-reference">[Reference: ${block.reference}
-                ${block.refLevels && block.refLevels.length > 0 ? " " + block.refLevels.join(".") : ""}]</span>` : ""} 
-                ${block.tags && block.tags.length ? `<small>[Tags: ${block.tags.join(", ")}]</small>` : ""}
-                <button class="btn btn-sm btn-warning edit-preview-block-btn ml-2" data-block-id="${block.id}">Edit</button>
-              `;
+    //     // Fetch and display the block
+    //     fetchBlockById(blockRef)
+    //       .then(block => {
+    //         if (block) {
+    //           // Create additional content with reference info
+    //           const blockAdditionalContent = `
+    //             ${block.reference ? `<span class="block-reference">[Reference: ${block.reference}
+    //             ${block.refLevels && block.refLevels.length > 0 ? " " + block.refLevels.join(".") : ""}]</span>` : ""} 
+    //             <button class="btn btn-sm btn-warning edit-preview-block-btn ml-2" data-block-id="${block.id}">Edit</button>
+    //           `;
               
-              // Create preview for the block
-              const blockPreview = createContentPreview(block.text, {
-                title: `${block.title || 'Block ' + block.id}`,
-                containerClass: "referenced-block-preview text-info",
-                showControls: false,
-                additionalFooterContent: blockAdditionalContent
-              });
+    //           // Create preview for the block
+    //           const blockPreview = createContentPreview(block.text, {
+    //             title: `${block.title || 'Block ' + block.id}`,
+    //             containerClass: "referenced-block-preview text-info",
+    //             showControls: false,
+    //             additionalFooterContent: blockAdditionalContent
+    //           });
               
-              // Replace the placeholder with the actual block preview
-              blockPlaceholder.replaceWith(blockPreview);
+    //           // Replace the placeholder with the actual block preview
+    //           blockPlaceholder.replaceWith(blockPreview);
               
-              // Add event handler for edit button
-              blockPreview.find(".edit-preview-block-btn").on("click", function() {
-                const blockId = $(this).data("block-id");
-                editBlockUniversal(blockId);
-              });
-            } else {
-              blockPlaceholder.replaceWith(`<p class="text-danger">Block with ID ${blockRef} not found</p>`);
-            }
-          })
-          .catch(error => {
-            console.error("Error fetching block:", error);
-            blockPlaceholder.replaceWith(`<p class="text-danger">Error loading block ${blockRef}: ${error.message}</p>`);
-          });
-      });
-    }
+    //           // Add event handler for edit button
+    //           blockPreview.find(".edit-preview-block-btn").on("click", function() {
+    //             const blockId = $(this).data("block-id");
+    //             editBlockUniversal(blockId);
+    //           });
+    //         } else {
+    //           blockPlaceholder.replaceWith(`<p class="text-danger">Block with ID ${blockRef} not found</p>`);
+    //         }
+    //       })
+    //       .catch(error => {
+    //         console.error("Error fetching block:", error);
+    //         blockPlaceholder.replaceWith(`<p class="text-danger">Error loading block ${blockRef}: ${error.message}</p>`);
+    //       });
+    //   });
+    // }
   });
 }
 
@@ -592,45 +591,45 @@ function previewDocument(doc) {
     
     // Handle block references
     const blockRefs = p.blockRefs || (p.blockRef ? [p.blockRef] : []);
-    if (blockRefs.length > 0) {
-      blockRefs.forEach(blockRef => {
-        paragraphContainer.append(`<p><em>Block Reference: ${blockRef}</em></p>`);
+    // if (blockRefs.length > 0) {
+    //   blockRefs.forEach(blockRef => {
+    //     paragraphContainer.append(`<p><em>Block Reference: ${blockRef}</em></p>`);
         
-        fetchBlockById(blockRef)
-          .then(block => {
-            if (block) {
-              // Create preview for referenced block
-              const blockAdditionalContent = `
-                ${block.reference ? `<span class="block-reference">[Reference: ${block.reference}
-                ${block.refLevels && block.refLevels.length > 0 ? " " + block.refLevels.join(".") : ""}]</span>` : ""} 
-                ${block.tags && block.tags.length ? `<small>[Tags: ${block.tags.join(", ")}]</small>` : ""}
-                <button class="btn btn-sm btn-warning edit-doc-block-btn ml-2" data-block-id="${block.id}">Edit</button>
-              `;
+    //     fetchBlockById(blockRef)
+    //       .then(block => {
+    //         if (block) {
+    //           // Create preview for referenced block
+    //           const blockAdditionalContent = `
+    //             ${block.reference ? `<span class="block-reference">[Reference: ${block.reference}
+    //             ${block.refLevels && block.refLevels.length > 0 ? " " + block.refLevels.join(".") : ""}]</span>` : ""} 
+    //             ${block.tags && block.tags.length ? `<small>[Tags: ${block.tags.join(", ")}]</small>` : ""}
+    //             <button class="btn btn-sm btn-warning edit-doc-block-btn ml-2" data-block-id="${block.id}">Edit</button>
+    //           `;
               
-              const blockPreview = createContentPreview(block.text, {
-                title: `${block.title || 'Block ' + block.id}`,
-                containerClass: "referenced-block-preview text-info",
-                showControls: false,
-                additionalFooterContent: blockAdditionalContent
-              });
+    //           const blockPreview = createContentPreview(block.text, {
+    //             title: `${block.title || 'Block ' + block.id}`,
+    //             containerClass: "referenced-block-preview text-info",
+    //             showControls: false,
+    //             additionalFooterContent: blockAdditionalContent
+    //           });
               
-              paragraphContainer.append(blockPreview);
+    //           paragraphContainer.append(blockPreview);
               
-              // Add event handler for edit buttons
-              blockPreview.find(".edit-doc-block-btn").on("click", function() {
-                const blockId = $(this).data("block-id");
-                editBlockUniversal(blockId);
-              });
-            } else {
-              paragraphContainer.append(`<p class="text-danger">Block not found</p>`);
-            }
-          })
-          .catch(error => {
-            console.error("Error fetching block:", error);
-            paragraphContainer.append(`<p class="text-danger">Error loading block: ${error.message}</p>`);
-          });
-      });
-    }
+    //           // Add event handler for edit buttons
+    //           blockPreview.find(".edit-doc-block-btn").on("click", function() {
+    //             const blockId = $(this).data("block-id");
+    //             editBlockUniversal(blockId);
+    //           });
+    //         } else {
+    //           paragraphContainer.append(`<p class="text-danger">Block not found</p>`);
+    //         }
+    //       })
+    //       .catch(error => {
+    //         console.error("Error fetching block:", error);
+    //         paragraphContainer.append(`<p class="text-danger">Error loading block: ${error.message}</p>`);
+    //       });
+    //   });
+    // }
   });
 
   // Set up delete button handler

@@ -20,7 +20,7 @@ function initializeDB() {
     
     function attemptConnection() {
       console.log("Attempting database connection");
-      const request = indexedDB.open("EnhancedNoteDB", 8);
+      const request = indexedDB.open("SuperNoteDB", 8);
       
       // Handle database upgrade
       request.onupgradeneeded = function(e) {
@@ -387,7 +387,7 @@ function resetDatabase() {
       db.close();
     }
     
-    const deleteRequest = indexedDB.deleteDatabase("EnhancedNoteDB");
+    const deleteRequest = indexedDB.deleteDatabase("SuperNoteDB");
     
     deleteRequest.onsuccess = function() {
       resolve();
