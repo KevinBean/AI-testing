@@ -27,6 +27,9 @@ function initializeDashboard() {
   
   // Initialize enhanced tag visualization
   initializeEnhancedTagVisualization();
+
+  // Initialize dashboard AI actions panel
+  initializeDashboardActions();
 }
 
 /**
@@ -1934,4 +1937,408 @@ function searchByTag(tagName) {
       reject(err);
     }
   });
+}
+
+/**
+ * Dashboard AI Actions Integration
+ * This code adds an AI Actions panel to the dashboard tab, allowing users to
+ * quickly execute actions without navigating to the Actions tab.
+ */
+
+// Add this to the dashboard.js file
+
+/**
+ * Initialize AI Actions panel on dashboard
+ */
+function initializeDashboardActions() {
+  // Create AI Actions panel
+  const actionsPanel = $(`
+    <div class="card shadow-sm mt-4">
+      <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-robot mr-2"></i> Quick AI Actions</h5>
+        <button class="btn btn-sm btn-outline-primary" id="refreshActionsBtn">
+          <i class="fas fa-sync-alt"></i> Refresh
+        </button>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info" id="dashboardActionsInfo">
+          <i class="fas fa-info-circle mr-2"></i> Select an action and content to process, then run the action directly from the dashboard.
+        </div>
+        
+        <div class="form-group">
+          <label for="dashboardActionSelect"><strong>Select Action</strong></label>
+          <select id="dashboardActionSelect" class="form-control">
+            <option value="">Choose an action...</option>
+          </select>
+          <small class="form-text text-muted">These actions are configured in the Actions tab</small>
+        </div>
+        
+        <div id="dashboardActionDetails" class="mb-3 d-none">
+          <div class="card bg-light">
+            <div class="card-body">
+              <h6 class="card-title" id="dashboardActionTitle"></h6>
+              <p class="card-text small" id="dashboardActionDescription"></p>
+              <div class="badge badge-info mb-2" id="dashboardActionModel"></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="dashboardActionInput"><strong>Input Content</strong></label>
+          <div class="input-source-options mb-2">
+            <div class="custom-control custom-radio custom-control-inline">
+              <input type="radio" id="inputSourceDirect" name="inputSource" class="custom-control-input" value="direct" checked>
+              <label class="custom-control-label" for="inputSourceDirect">Direct Input</label>
+            </div>
+            <div class="custom-control custom-radio custom-control-inline">
+              <input type="radio" id="inputSourceSelect" name="inputSource" class="custom-control-input" value="select">
+              <label class="custom-control-label" for="inputSourceSelect">Select Content</label>
+            </div>
+          </div>
+          
+          <div id="directInputContainer">
+            <textarea id="dashboardActionInput" class="form-control" rows="4" placeholder="Enter content to process..."></textarea>
+          </div>
+          
+          <div id="selectContentContainer" class="d-none">
+            <button id="dashboardSelectContentBtn" class="btn btn-outline-secondary btn-block">
+              <i class="fas fa-list"></i> Select Content Items
+            </button>
+            <div id="dashboardSelectedItems" class="mt-2">
+              <small class="text-muted">No items selected</small>
+            </div>
+          </div>
+        </div>
+        
+        <button id="dashboardRunActionBtn" class="btn btn-primary btn-block" disabled>
+          <i class="fas fa-play"></i> Run Action
+        </button>
+      </div>
+    </div>
+    
+    <div id="dashboardActionResultContainer" class="mt-3"></div>
+  `);
+  
+  // Add the panel to the dashboard after the search card
+  actionsPanel.insertAfter($("#dashboardView .universal-search-container").closest(".row").next());
+  
+  // Setup event handlers
+  initializeDashboardActionHandlers();
+  
+  // Load available actions
+  loadActionsForDashboard();
+}
+
+/**
+ * Initialize event handlers for dashboard actions panel
+ */
+function initializeDashboardActionHandlers() {
+  // Action selection change handler
+  $("#dashboardActionSelect").on("change", function() {
+    const actionId = $(this).val();
+    if (actionId) {
+      fetchActionDetails(actionId);
+      $("#dashboardRunActionBtn").prop("disabled", false);
+    } else {
+      $("#dashboardActionDetails").addClass("d-none");
+      $("#dashboardRunActionBtn").prop("disabled", true);
+    }
+  });
+  
+  // Input source radio buttons
+  $("input[name='inputSource']").on("change", function() {
+    const inputSource = $(this).val();
+    if (inputSource === "direct") {
+      $("#directInputContainer").removeClass("d-none");
+      $("#selectContentContainer").addClass("d-none");
+    } else {
+      $("#directInputContainer").addClass("d-none");
+      $("#selectContentContainer").removeClass("d-none");
+    }
+  });
+  
+  // Select content button
+  $("#dashboardSelectContentBtn").on("click", function() {
+    dashboardPrepareContentSelection();
+  });
+  
+  // Run action button
+  $("#dashboardRunActionBtn").on("click", function() {
+    runActionFromDashboard();
+  });
+  
+  // Refresh actions button
+  $("#refreshActionsBtn").on("click", function() {
+    $(this).find("i").addClass("fa-spin");
+    loadActionsForDashboard().then(() => {
+      setTimeout(() => {
+        $(this).find("i").removeClass("fa-spin");
+      }, 500);
+    });
+  });
+}
+
+/**
+ * Load available actions for the dashboard dropdown
+ * @returns {Promise} Promise that resolves when actions are loaded
+ */
+function loadActionsForDashboard() {
+  return new Promise((resolve, reject) => {
+    const actionSelect = $("#dashboardActionSelect");
+    actionSelect.html('<option value="">Choose an action...</option>');
+    
+    if (!db) {
+      actionSelect.append('<option value="" disabled>Database not available</option>');
+      resolve();
+      return;
+    }
+    
+    const transaction = db.transaction("actions", "readonly");
+    const store = transaction.objectStore("actions");
+    
+    store.openCursor().onsuccess = function(e) {
+      const cursor = e.target.result;
+      if (cursor) {
+        const action = cursor.value;
+        actionSelect.append(`<option value="${action.id}">${action.title}</option>`);
+        cursor.continue();
+      } else {
+        resolve();
+      }
+    };
+    
+    transaction.onerror = function(e) {
+      console.error("Error loading actions:", e.target.error);
+      reject(e.target.error);
+    };
+  });
+}
+
+/**
+ * Fetch action details when selected
+ * @param {number} actionId - The action ID
+ */
+function fetchActionDetails(actionId) {
+  if (!db) {
+    showNotification("Database not available. Please refresh the page.", "danger");
+    return;
+  }
+  
+  const transaction = db.transaction("actions", "readonly");
+  const store = transaction.objectStore("actions");
+  
+  store.get(parseInt(actionId)).onsuccess = function(e) {
+    const action = e.target.result;
+    if (action) {
+      $("#dashboardActionTitle").text(action.title);
+      $("#dashboardActionDescription").text(action.description || "No description available.");
+      $("#dashboardActionModel").text(`Model: ${action.model || "Default"}`);
+      $("#dashboardActionDetails").removeClass("d-none");
+    } else {
+      $("#dashboardActionDetails").addClass("d-none");
+      showNotification("Action not found", "warning");
+    }
+  };
+}
+
+/**
+ * Prepare content selection for dashboard action
+ */
+function dashboardPrepareContentSelection() {
+  // Initialize selection modal with empty selection
+  selectedContentItems = [];
+  updateSelectedItemsUI();
+  
+  // Set modal title and info
+  $("#contentSelectionModalLabel").text("Select Content for Action");
+  $(".action-selection-info").text("Select content to process with this action");
+  $("#contentSelectionModal").data("selection-mode", "multiple");
+  
+  // Clear dashboard-specific flag if present
+  $("#contentSelectionModal").removeData("dashboard-action");
+  // Set dashboard flag to handle confirmation differently
+  $("#contentSelectionModal").data("dashboard-action", true);
+  
+  // Load content for selection
+  loadBlocksForSelection();
+  loadDocumentsForSelection();
+  loadTagsForSelection();
+  loadReferencesForSelection();
+  
+  // Custom handling for dashboard actions
+  $("#confirmContentSelection").off("click").on("click", function() {
+    // Update the dashboard UI with selection info
+    $("#dashboardSelectedItems").html(
+      `<small class="text-success"><i class="fas fa-check-circle"></i> ${selectedContentItems.length} item(s) selected</small>`
+    );
+    
+    // Close the modal
+    $("#contentSelectionModal").modal("hide");
+  });
+  
+  // Show the modal
+  $("#contentSelectionModal").modal("show");
+}
+
+/**
+ * Run action from dashboard
+ */
+async function runActionFromDashboard() {
+  const actionId = $("#dashboardActionSelect").val();
+  if (!actionId) {
+    showNotification("Please select an action first", "warning");
+    return;
+  }
+  
+  const inputSource = $("input[name='inputSource']:checked").val();
+  let content = "";
+  
+  // Show loading indicator
+  $("#dashboardActionResultContainer").html('<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Processing...</div>');
+  
+  try {
+    if (inputSource === "direct") {
+      // Get direct input content
+      content = $("#dashboardActionInput").val().trim();
+      if (!content) {
+        showNotification("Please enter some content to process", "warning");
+        $("#dashboardActionResultContainer").empty();
+        return;
+      }
+    } else {
+      // Get content from selected items
+      if (selectedContentItems.length === 0) {
+        showNotification("Please select some content items first", "warning");
+        $("#dashboardActionResultContainer").empty();
+        return;
+      }
+      
+      try {
+        content = await assembleContentFromSelectedItems();
+      } catch (error) {
+        console.error("Error assembling content:", error);
+        showNotification("Error preparing selected content: " + error.message, "danger");
+        $("#dashboardActionResultContainer").empty();
+        return;
+      }
+    }
+    
+    // Custom version of runActionWithContent specifically for dashboard
+    executeDashboardAction(actionId, content);
+    
+  } catch (error) {
+    console.error("Error running action:", error);
+    $("#dashboardActionResultContainer").html(`
+      <div class="alert alert-danger">
+        <strong>Error:</strong> ${error.message || "An error occurred while running the action"}
+      </div>
+    `);
+  }
+}
+
+/**
+ * Execute an action from the dashboard
+ * @param {number} actionId - The action ID
+ * @param {string} content - The content to process
+ */
+function executeDashboardAction(actionId, content) {
+  if (!db) {
+    showNotification("Database not available. Please refresh the page.", "danger");
+    return;
+  }
+  
+  const transaction = db.transaction("actions", "readonly");
+  const store = transaction.objectStore("actions");
+  
+  store.get(parseInt(actionId)).onsuccess = function(e) {
+    const action = e.target.result;
+    if (!action) {
+      $("#dashboardActionResultContainer").html('<div class="alert alert-danger">Action not found</div>');
+      return;
+    }
+    
+    const contentPreview = $(`
+      <div class="card mb-3 dashboard-result-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span>Content Preview</span>
+          <button class="btn btn-sm btn-outline-secondary toggle-content-btn">
+            <i class="fas fa-eye-slash"></i> Hide
+          </button>
+        </div>
+        <div class="card-body content-preview-body">
+          <div class="alert alert-info">
+            <small class="text-muted">This is the content that will be processed:</small>
+          </div>
+          <pre class="bg-light p-2 border rounded" id="combinedContent">${content || '<em>No content provided</em>'}</pre>
+        </div>
+      </div>
+    `);
+    
+    contentPreview.find('.toggle-content-btn').on('click', function() {
+      const previewBody = contentPreview.find('.content-preview-body');
+      const btn = $(this);
+      
+      if (previewBody.is(':visible')) {
+        previewBody.slideUp();
+        btn.html('<i class="fas fa-eye"></i> Show');
+      } else {
+        previewBody.slideDown();
+        btn.html('<i class="fas fa-eye-slash"></i> Hide');
+      }
+    });
+    
+    const processedPrompt = action.prompt.replace(/{content}/g, content || "");
+    
+    if (!openaiApiKey) {
+      $("#dashboardActionResultContainer").html(`
+        <div class="alert alert-warning">
+          <strong>API Key Missing!</strong> Please add your OpenAI API key in the Settings tab to use this feature.
+        </div>
+      `);
+      return;
+    }
+    
+    $("#dashboardActionResultContainer").html('');
+    $("#dashboardActionResultContainer").append(contentPreview);
+    $("#dashboardActionResultContainer").append('<div class="text-center my-3"><i class="fas fa-spinner fa-spin"></i> Processing your request...</div>');
+    
+    callOpenAiApi(action, processedPrompt).then(response => {
+      $("#dashboardActionResultContainer").find('.text-center').remove();
+      $("#dashboardActionResultContainer").append(`
+        <div class="card dashboard-result-card">
+          <div class="card-header">Result</div>
+          <div class="card-body">
+            <div class="bg-light p-3 border rounded result-content">${renderMarkdown(response)}</div>
+            <div class="mt-3">
+              <button class="btn btn-sm btn-outline-primary copy-result-btn">
+                <i class="fas fa-copy"></i> Copy Results
+              </button>
+              <button class="btn btn-sm btn-outline-success save-as-paragraph-btn">
+                <i class="fas fa-save"></i> Save as Paragraph
+              </button>
+            </div>
+          </div>
+        </div>
+      `);
+      
+      renderMermaidIn("#dashboardActionResultContainer .result-content .mermaid");
+      
+      $("#dashboardActionResultContainer").data("raw-result", response);
+      
+      $(".copy-result-btn").click(function() {
+        copyTextToClipboard(response);
+      });
+      
+      $(".save-as-paragraph-btn").click(function() {
+        saveResultAsParagraph(response);
+      });
+    }).catch(error => {
+      $("#dashboardActionResultContainer").find('.text-center').remove();
+      $("#dashboardActionResultContainer").append(`
+        <div class="alert alert-danger">
+          <strong>Error:</strong> ${error.message || error}
+        </div>
+      `);
+    });
+  };
 }

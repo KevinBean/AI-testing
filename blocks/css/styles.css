@@ -672,3 +672,362 @@ li .tag-tree:before {
   border-radius: 0;
   background-color: #f8f9fa;
 }
+
+/* Add these styles to css/styles.css */
+
+/* Dashboard Action Card Styles */
+.dashboard-action-card {
+  transition: all 0.3s ease;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+  border: none;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.dashboard-action-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+}
+
+.dashboard-action-card .card-header {
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-bottom: none;
+  padding: 1rem 1.5rem;
+}
+
+#selectedActionInfo {
+  transition: all 0.3s ease;
+  border-left: 4px solid #007bff !important;
+}
+
+#selectedActionInfo #selectedActionTitle {
+  color: #007bff;
+}
+
+#selectedActionInfo #selectedActionDescription {
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+#dashboardActionSelect {
+  border-radius: 10px;
+  border: 1px solid #ced4da;
+  padding: 0.5rem 1rem;
+  transition: all 0.2s;
+}
+
+#dashboardActionSelect:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+#dashboardActionInput {
+  border-radius: 10px;
+  resize: vertical;
+  transition: all 0.2s;
+  min-height: 100px;
+}
+
+#dashboardActionInput:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+#runDashboardActionBtn {
+  border-radius: 30px;
+  padding: 0.5rem 1.5rem;
+  font-weight: 500;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  transition: all 0.3s;
+}
+
+#runDashboardActionBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+#runDashboardActionBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+#dashboardSelectContentBtn {
+  border-radius: 10px;
+  padding: 0.5rem 1rem;
+  transition: all 0.2s;
+}
+
+#dashboardSelectContentBtn:hover {
+  background-color: #007bff;
+  color: white;
+}
+
+#dashboardSelectedContent {
+  border-left: 3px solid #e9ecef;
+  padding-left: 10px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+#dashboardActionResult {
+  min-height: 300px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+#dashboardActionResult::-webkit-scrollbar {
+  width: 6px;
+}
+
+#dashboardActionResult::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+#dashboardActionResult::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+#dashboardActionResult::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.result-content {
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.result-content pre {
+  background-color: #f8f9fa;
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.result-content blockquote {
+  border-left: 4px solid #007bff;
+  background-color: #f8f9fa;
+  padding: 1rem;
+  border-radius: 4px;
+  font-style: italic;
+}
+
+/* Animation for loading spinner */
+@keyframes spinner-border {
+  to { transform: rotate(360deg); }
+}
+
+.spinner-border {
+  display: inline-block;
+  width: 2rem;
+  height: 2rem;
+  vertical-align: text-bottom;
+  border: 0.25em solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spinner-border .75s linear infinite;
+}
+
+.spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+  border-width: 0.2em;
+}
+
+/* Style for Quick Action Center */
+#dashboardView .card {
+  border-radius: 10px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  margin-bottom: 20px;
+}
+
+/* Improve the action selection dropdown */
+#dashboardActionSelect {
+  padding: 8px;
+  margin-bottom: 15px;
+}
+
+/* Style the Run Action button */
+#runDashboardActionBtn {
+  background-color: #007bff;
+  color: white;
+  padding: 8px 16px;
+  width: 100%;
+  margin-top: 10px;
+  margin-bottom: 15px;
+}
+
+/* Style the results area */
+#dashboardActionResult {
+  border: 1px solid #e9ecef;
+  padding: 15px;
+  min-height: 200px;
+  background-color: #f8f9fa;
+}
+
+/* Style the result action buttons */
+.copy-result-btn, .save-result-btn {
+  margin-left: 5px;
+}
+
+/* Improve the welcome banner */
+#dashboardView .jumbotron {
+  background-color: #f8f9fa;
+  border-radius: 10px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  padding: 30px;
+}
+
+#dashboardView .jumbotron h2 {
+  color: #343a40;
+  margin-bottom: 15px;
+}
+
+#dashboardView .jumbotron p {
+  color: #6c757d;
+}
+
+/* Improve stats display */
+#blocksCount, #documentsCount, #referencesCount, #tagsCount {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #007bff;
+}
+
+.fas.fa-cube, .fas.fa-file-alt, .fas.fa-bookmark, .fas.fa-tags {
+  color: #6c757d;
+  margin-bottom: 10px;
+}
+
+/* Dashboard AI Actions styles to add to styles.css */
+
+/* Quick AI Actions panel */
+.quick-ai-actions-panel {
+  transition: all 0.3s ease;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.quick-ai-actions-panel:hover {
+  box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+}
+
+.quick-ai-actions-panel .card-header {
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-bottom: none;
+}
+
+/* Action details card */
+#dashboardActionDetails .card {
+  transition: all 0.2s ease;
+  border-left: 4px solid #007bff;
+}
+
+#dashboardActionDetails .card:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Action model badge */
+#dashboardActionModel {
+  background-color: rgba(23, 162, 184, 0.1);
+  color: #17a2b8;
+  font-weight: normal;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+}
+
+/* Input source options */
+.input-source-options .custom-control-input:checked ~ .custom-control-label::before {
+  border-color: #007bff;
+  background-color: #007bff;
+}
+
+/* Select content button */
+#dashboardSelectContentBtn {
+  transition: all 0.2s ease;
+  border-radius: 6px;
+  border-color: #ced4da;
+  padding: 0.6rem;
+}
+
+#dashboardSelectContentBtn:hover {
+  background-color: #f8f9fa;
+  border-color: #adb5bd;
+}
+
+/* Run action button */
+#dashboardRunActionBtn {
+  transition: all 0.3s ease;
+  border-radius: 6px;
+  font-weight: 500;
+  position: relative;
+  overflow: hidden;
+}
+
+#dashboardRunActionBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+}
+
+#dashboardRunActionBtn:after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: all 0.6s ease;
+}
+
+#dashboardRunActionBtn:hover:after {
+  left: 100%;
+}
+
+/* Action results container */
+#dashboardActionResultContainer {
+  transition: max-height 0.3s ease;
+  overflow: hidden;
+}
+
+/* Selected items badge */
+#dashboardSelectedItems .badge {
+  transition: all 0.2s ease;
+}
+
+/* Animation for refresh button */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+#refreshActionsBtn .fa-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Results container styling */
+.dashboard-result-card {
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.dashboard-result-card .card-header {
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-bottom: none;
+  padding: 0.75rem 1rem;
+}
+
+.dashboard-result-card:hover {
+  box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+}
+
+.dashboard-result-content {
+  padding: 1rem;
+  border-radius: 6px;
+  background-color: #f8f9fa;
+  border: 1px solid rgba(0,0,0,0.1);
+}
