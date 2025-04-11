@@ -11,10 +11,15 @@ let db;
  */
 function initializeDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open("EnhancedNoteDB", 7); // Increment version for schema update
+    let retryCount = 0;
+    const maxRetries = 3;
     
-    request.onupgradeneeded = function(e) {
-      db = e.target.result;
+    function attemptConnection() {
+      const request = indexedDB.open("EnhancedNoteDB", 7);
+      
+      // Keep your existing onupgradeneeded handler
+      request.onupgradeneeded = function(e) {
+        db = e.target.result;
       
       // Only create stores if they don't already exist
       if (!db.objectStoreNames.contains("documents")) {
@@ -85,9 +90,22 @@ function initializeDB() {
     };
     
     request.onerror = function(e) {
-      console.error("DB error:", e.target.error);
-      reject(e.target.error);
+      const error = e.target.error;
+      console.error("DB error:", error);
+      
+      if (retryCount < maxRetries) {
+        retryCount++;
+        console.log(`Retry attempt ${retryCount}/${maxRetries}...`);
+        setTimeout(attemptConnection, 1000); // Wait before retrying
+      } else {
+        // Show user-friendly error
+        showNotification(`Database error: ${error.message}. Try reloading the page or reset the database in Settings.`, "danger", 8000);
+        reject(error);
+      }
     };
+  }
+  
+  attemptConnection();
   });
 }
 
