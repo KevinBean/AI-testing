@@ -529,6 +529,15 @@ function completeWorkflowExecution() {
 
 // Initialize when document is ready
 $(document).ready(function() {
+
+  // In main.js, add this to the document ready function
+initializeConversations();
+
+// Add this to registerEventHandlers
+$("#conversationSearch").on("keyup", function() {
+  loadConversations($(this).val().trim());
+});
+
   // Initialize the workflow handlers
   initializeWorkflowHandlers();
   

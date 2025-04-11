@@ -20,7 +20,7 @@ function initializeDB() {
     
     function attemptConnection() {
       console.log("Attempting database connection");
-      const request = indexedDB.open("EnhancedNoteDB", 7);
+      const request = indexedDB.open("EnhancedNoteDB", 8);
       
       // Handle database upgrade
       request.onupgradeneeded = function(e) {
@@ -30,6 +30,12 @@ function initializeDB() {
         // Only create stores if they don't already exist
         if (!db.objectStoreNames.contains("documents")) {
           db.createObjectStore("documents", { keyPath: "id", autoIncrement: true });
+        }
+
+        if (!db.objectStoreNames.contains("conversations")) {
+          const conversationsStore = db.createObjectStore("conversations", { keyPath: "id", autoIncrement: true });
+          conversationsStore.createIndex("title", "title", { unique: false });
+          conversationsStore.createIndex("updated", "updated", { unique: false });
         }
         
         // Rename clauses store to blocks if needed

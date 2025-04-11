@@ -189,6 +189,31 @@ function loadBlocks(searchTerm = "") {
           }
           
           const li = $("<li>").addClass("list-group-item list-item").html(display);
+
+          // ADD CONTEXT MENU HERE:
+      const contextMenu = $(`
+        <div class="dropdown float-right">
+          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-toggle="dropdown">
+            <i class="fas fa-ellipsis-v"></i>
+          </button>
+          <div class="dropdown-menu dropdown-menu-right">
+            <a class="dropdown-item edit-block-item" href="#" data-block-id="${block.id}">
+              <i class="fas fa-edit"></i> Edit
+            </a>
+            <a class="dropdown-item delete-block-item" href="#" data-block-id="${block.id}">
+              <i class="fas fa-trash"></i> Delete
+            </a>
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item start-conversation" href="#" 
+              data-type="block" data-id="${block.id}" data-title="${title}">
+              <i class="fas fa-comments"></i> Start Conversation
+            </a>
+          </div>
+        </div>
+      `);
+
+            // Prepend the context menu to the list item (or append, depending on your layout)
+            li.prepend(contextMenu);
           
           li.on("click", function() {
             showBlockDetails(block);
@@ -307,6 +332,12 @@ function showBlockDetails(block) {
         <div class="btn-group float-right">
           <button class="btn btn-sm btn-warning edit-block-btn" data-block-id="${block.id}">Edit</button>
           <button class="btn btn-sm btn-danger delete-block-btn">Delete</button>
+          
+          <!-- ADD CONVERSATION BUTTON HERE -->
+          <button class="btn btn-sm btn-info start-conversation" 
+                  data-type="block" data-id="${block.id}" data-title="${title}">
+            <i class="fas fa-comments"></i> Start Conversation
+          </button>
         </div>
       </div>
       <div class="card-body" id="blockContentContainer"></div>

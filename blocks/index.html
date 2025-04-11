@@ -50,6 +50,11 @@
         </a>
       </li>
       <li class="nav-item">
+        <a class="nav-link" id="conversations-tab" data-toggle="tab" href="#conversationsView" role="tab">
+          <i class="fas fa-comments"></i> Conversations
+        </a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link" id="actions-tab" data-toggle="tab" href="#actionsView" role="tab">
           <i class="fas fa-robot"></i> Actions
         </a>
@@ -546,6 +551,59 @@
   </div>
 
 
+</div>
+
+<!-- Conversations View -->
+<div class="tab-pane fade" id="conversationsView" role="tabpanel">
+  <div class="row">
+    <div class="col-md-3">
+      <!-- Conversation List -->
+      <div class="mb-2">
+        <button id="newConversationBtn" class="btn btn-primary btn-block mt-3">New Conversation</button>
+      </div>
+      <div class="mb-2">
+        <input type="text" id="conversationSearch" class="form-control" placeholder="Search conversations...">
+      </div>
+      <div class="section-title">Saved Conversations</div>
+      <ul id="conversationList" class="list-group"></ul>
+    </div>
+    
+    <div class="col-md-9">
+      <!-- Active Conversation -->
+      <div id="activeConversation" class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span id="conversationTitle">Select or start a conversation</span>
+          <div class="btn-group">
+            <button class="btn btn-sm btn-outline-secondary" id="exportConversationBtn">Export</button>
+            <button class="btn btn-sm btn-outline-success" id="saveInsightsBtn">Save Insights</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="conversationMessages" class="mb-3"></div>
+          
+          <div id="conversationInputContainer">
+            <div class="d-flex mb-2">
+              <button id="addContentReferenceBtn" class="btn btn-sm btn-outline-info mr-2">
+                <i class="fas fa-link"></i> Add Reference
+              </button>
+              <select id="conversationActionSelect" class="form-control form-control-sm">
+                <option value="">Default Assistant</option>
+                <!-- Actions will be populated here -->
+              </select>
+            </div>
+            <div class="input-group">
+              <textarea id="conversationInput" class="form-control" rows="3" placeholder="Type your message..."></textarea>
+              <div class="input-group-append">
+                <button id="sendMessageBtn" class="btn btn-primary">
+                  <i class="fas fa-paper-plane"></i> Send
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 
@@ -1335,6 +1393,7 @@ $$</pre>
   <script src="js/modules/collections.js"></script>
   <script src="js/modules/tags.js"></script>
   <script src="js/modules/dashboard.js"></script>
+  <script src="js/modules/conversations.js"></script>
   <script src="js/modules/actions.js"></script>
   <script src="js/modules/workflows.js"></script>
   <script src="js/modules/settings.js"></script>
